@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import type { BiteReport, BiteReportStatusHistory, VaccinationRecord, ReportStatus, Barangay, Profile } from '@/types';
 import { REPORT_STATUS_COLORS, REPORT_STATUS_LABELS, SEVERITY_COLORS, SEVERITY_LABELS, ANIMAL_TYPE_LABELS, CATEGORY_LABELS, VACCINATION_STATUS_COLORS, VACCINATION_STATUS_LABELS } from '@/config/constants';
 import { formatDate, formatDateTime, cn, getErrorMessage } from '@/lib/utils';
+import { notifyUser } from '@/lib/notifications';
 import { ArrowLeft, Loader2, AlertCircle, Clock, Syringe, User, PawPrint, MapPin, ShieldCheck, Send, CheckCircle2, UserPlus } from 'lucide-react';
 
 const ALL_STATUSES: ReportStatus[] = ['reported','under_investigation','treatment_started','treatment_ongoing','treatment_completed','closed','cancelled'];
@@ -96,10 +97,24 @@ export default function ReportDetailPage() {
 
   const handleStatusUpdate = async () => {
     if (!id || !newStatus || !profile) return;
+    const newStatusLabel = REPORT_STATUS_LABELS[newStatus];
     setUpdatingStatus(true); setStatusSuccess(false); setStatusError('');
     const { error: e } = await supabase.rpc('update_report_status', { p_report_id: id, p_new_status: newStatus, p_notes: statusNote.trim() });
-    if (e) { setStatusError(getErrorMessage(e, 'Failed to update status')); }
-    else { setStatusSuccess(true); setNewStatus(''); setStatusNote(''); await refreshReport(); }
+    if (e) {
+      setStatusError(getErrorMessage(e, 'Failed to update status'));
+    } else {
+      if (report?.reporter_id && report.reporter_id !== profile.id) {
+        await notifyUser({
+          userId: report.reporter_id,
+          title: 'Bite report status updated',
+          message: `Your report for ${report.patient_name} is now "${newStatusLabel}".`,
+          type: 'info',
+          referenceType: 'bite_report',
+          referenceId: id,
+        });
+      }
+      setStatusSuccess(true); setNewStatus(''); setStatusNote(''); await refreshReport();
+    }
     setUpdatingStatus(false);
   };
 
@@ -119,8 +134,21 @@ export default function ReportDetailPage() {
       administered_date: new Date().toISOString().split('T')[0],
       administered_by: profile?.id,
     }).eq('id', vaccId);
-    if (e) { setStatusError(getErrorMessage(e, 'Failed to mark dose as done')); }
-    else await refreshReport();
+    if (e) {
+      setStatusError(getErrorMessage(e, 'Failed to mark dose as done'));
+    } else {
+      if (report?.reporter_id && report.reporter_id !== profile?.id) {
+        await notifyUser({
+          userId: report.reporter_id,
+          title: 'Vaccination dose completed',
+          message: `A vaccination dose for ${report.patient_name} was marked as given.`,
+          type: 'success',
+          referenceType: 'vaccination',
+          referenceId: id,
+        });
+      }
+      await refreshReport();
+    }
     setMarkingDose(null);
   };
 

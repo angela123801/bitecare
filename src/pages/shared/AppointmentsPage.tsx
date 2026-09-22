@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { VACCINATION_STATUS_LABELS, VACCINATION_STATUS_COLORS } from '@/config/constants';
-import { formatDate } from '@/lib/utils';
+import { formatDate, getErrorMessage } from '@/lib/utils';
+import { notifyUser, getReportReporterId } from '@/lib/notifications';
 import type { VaccinationRecord } from '@/types';
 import { CalendarDays, Loader2, Inbox, Check, X, AlertTriangle } from 'lucide-react';
 
@@ -23,7 +24,7 @@ export default function AppointmentsPage() {
       .select('*')
       .in('status', ['scheduled', 'rescheduled'])
       .order('scheduled_date', { ascending: true });
-    if (err) { setError(err.message); }
+    if (err) { setError(getErrorMessage(err, 'Unable to load appointments.')); setRecords([]); }
     else { setRecords((data as VaccinationRecord[]) ?? []); }
     setLoading(false);
   }
@@ -40,15 +41,27 @@ export default function AppointmentsPage() {
 
   const overdueCount = records.filter(r => r.scheduled_date < today).length;
 
-  async function markCompleted(id: string) {
-    const { error: err } = await supabase.from('vaccination_records').update({ status: 'completed', administered_date: today, updated_at: new Date().toISOString() }).eq('id', id);
-    if (err) { setError(err.message); return; }
-    loadAppointments();
-  }
+  async function updateStatus(id: string, status: 'completed' | 'missed', label: string) {
+    const record = records.find(r => r.id === id);
+    const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+    if (status === 'completed') patch.administered_date = today;
 
-  async function markMissed(id: string) {
-    const { error: err } = await supabase.from('vaccination_records').update({ status: 'missed', updated_at: new Date().toISOString() }).eq('id', id);
-    if (err) { setError(err.message); return; }
+    const { error: err } = await supabase.from('vaccination_records').update(patch).eq('id', id);
+    if (err) { setError(getErrorMessage(err, 'Failed to update appointment')); return; }
+
+    if (record) {
+      const reporterId = await getReportReporterId(record.report_id);
+      if (reporterId) {
+        await notifyUser({
+          userId: reporterId,
+          title: `Appointment ${label}`,
+          message: `The vaccination appointment for ${record.patient_name} (${formatDate(record.scheduled_date)}) was marked as ${label}.`,
+          type: status === 'completed' ? 'success' : 'warning',
+          referenceType: 'vaccination',
+          referenceId: record.report_id,
+        });
+      }
+    }
     loadAppointments();
   }
 
@@ -119,10 +132,10 @@ export default function AppointmentsPage() {
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${VACCINATION_STATUS_COLORS[r.status]}`}>
                     {isOverdue ? 'Overdue' : VACCINATION_STATUS_LABELS[r.status]}
                   </span>
-                  <button onClick={() => markCompleted(r.id)} className="p-1.5 rounded text-success-600 hover:bg-success-50" title="Complete">
+                  <button onClick={() => updateStatus(r.id, 'completed', 'completed')} className="p-1.5 rounded text-success-600 hover:bg-success-50" title="Complete">
                     <Check className="w-4 h-4" />
                   </button>
-                  <button onClick={() => markMissed(r.id)} className="p-1.5 rounded text-danger-600 hover:bg-danger-50" title="Missed">
+                  <button onClick={() => updateStatus(r.id, 'missed', 'missed')} className="p-1.5 rounded text-danger-600 hover:bg-danger-50" title="Missed">
                     <X className="w-4 h-4" />
                   </button>
                 </div>

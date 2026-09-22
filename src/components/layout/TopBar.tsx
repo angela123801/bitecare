@@ -49,7 +49,13 @@ export default function TopBar({ onMenuClick, unreadCount }: TopBarProps) {
 
   const handleSignOut = async () => {
     setMenuOpen(false);
-    await signOut();
+    try {
+      await signOut();
+    } catch (err) {
+      // Even if the network call fails, clear local state so the user is not
+      // left in a half-authenticated state; the guard will send them to login.
+      console.error('Sign out error:', getErrorMessage(err));
+    }
     navigate('/login', { replace: true });
   };
 

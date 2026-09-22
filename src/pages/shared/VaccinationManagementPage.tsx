@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { VACCINATION_STATUS_LABELS, VACCINATION_STATUS_COLORS, ESSEN_REGIMEN_DAYS } from '@/config/constants';
 import { formatDate, getErrorMessage } from '@/lib/utils';
+import { notifyUser, getReportReporterId } from '@/lib/notifications';
 import type { VaccinationRecord, BiteReport } from '@/types';
 import { Loader2, Search, Plus, X, Inbox, Check } from 'lucide-react';
 
@@ -61,24 +62,48 @@ export default function VaccinationManagementPage() {
     });
 
     const { error: err } = await supabase.from('vaccination_records').insert(recs);
-    if (err) { setError(getErrorMessage(err, 'Failed to generate schedule')); }
-    else { setShowForm(false); setForm({ report_id: '', vaccine_type: 'PVRV', generateSchedule: true }); loadRecords(); }
+    if (err) {
+      setError(getErrorMessage(err, 'Failed to generate schedule'));
+    } else {
+      const reporterId = await getReportReporterId(form.report_id);
+      if (reporterId) {
+        await notifyUser({
+          userId: reporterId,
+          title: 'Vaccination schedule created',
+          message: `A ${form.vaccine_type} vaccination schedule (${recs.length} doses) was created for ${report?.patient_name ?? 'the patient'}. First appointment: ${formatDate(recs[0].scheduled_date)}.`,
+          type: 'reminder',
+          referenceType: 'vaccination',
+          referenceId: form.report_id,
+        });
+      }
+      setShowForm(false);
+      setForm({ report_id: '', vaccine_type: 'PVRV', generateSchedule: true });
+      loadRecords();
+    }
     setSaving(false);
   }
 
-  async function markCompleted(id: string) {
-    const { error: err } = await supabase.from('vaccination_records').update({
-      status: 'completed',
-      administered_date: new Date().toISOString().split('T')[0],
-      updated_at: new Date().toISOString(),
-    }).eq('id', id);
-    if (err) { setError(getErrorMessage(err, 'Failed to update record')); return; }
-    loadRecords();
-  }
+  async function updateStatus(id: string, status: 'completed' | 'missed', label: string) {
+    const record = records.find(r => r.id === id);
+    const patch: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+    if (status === 'completed') patch.administered_date = new Date().toISOString().split('T')[0];
 
-  async function markMissed(id: string) {
-    const { error: err } = await supabase.from('vaccination_records').update({ status: 'missed', updated_at: new Date().toISOString() }).eq('id', id);
+    const { error: err } = await supabase.from('vaccination_records').update(patch).eq('id', id);
     if (err) { setError(getErrorMessage(err, 'Failed to update record')); return; }
+
+    if (record) {
+      const reporterId = await getReportReporterId(record.report_id);
+      if (reporterId) {
+        await notifyUser({
+          userId: reporterId,
+          title: `Vaccination ${label}`,
+          message: `Dose ${record.dose_label || record.dose_number} (${record.vaccine_type}) for ${record.patient_name} was marked as ${label}.`,
+          type: status === 'completed' ? 'success' : 'warning',
+          referenceType: 'vaccination',
+          referenceId: record.report_id,
+        });
+      }
+    }
     loadRecords();
   }
 
@@ -180,10 +205,10 @@ export default function VaccinationManagementPage() {
                     <td className="px-4 py-3">
                       {r.status === 'scheduled' && (
                         <div className="flex items-center gap-1">
-                          <button onClick={() => markCompleted(r.id)} className="p-1.5 rounded text-success-600 hover:bg-success-50" title="Mark Completed">
+                          <button onClick={() => updateStatus(r.id, 'completed', 'completed')} className="p-1.5 rounded text-success-600 hover:bg-success-50" title="Mark Completed">
                             <Check className="w-4 h-4" />
                           </button>
-                          <button onClick={() => markMissed(r.id)} className="p-1.5 rounded text-danger-600 hover:bg-danger-50" title="Mark Missed">
+                          <button onClick={() => updateStatus(r.id, 'missed', 'missed')} className="p-1.5 rounded text-danger-600 hover:bg-danger-50" title="Mark Missed">
                             <X className="w-4 h-4" />
                           </button>
                         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { formatRelativeTime, cn, getErrorMessage } from '@/lib/utils';
@@ -37,7 +37,8 @@ const TYPE_BG: Record<NotificationType, string> = {
 type Filter = 'all' | 'unread';
 
 export default function NotificationsPage() {
-  const { user } = useAuth();
+  const { user, isRoleAtLeast } = useAuth();
+  const navigate = useNavigate();
   const { refreshNotifications } = useOutletContext<{ refreshNotifications: () => Promise<number | undefined> }>();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +108,18 @@ export default function NotificationsPage() {
 
   const filtered = filter === 'unread' ? notifications.filter((n) => !n.is_read) : notifications;
   const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+  const openNotification = (n: Notification) => {
+    if (!n.is_read) markAsRead(n.id);
+    if (n.reference_type === 'bite_report' || n.reference_type === 'vaccination') {
+      const isStaff = isRoleAtLeast('health_worker');
+      if (n.reference_id) {
+        navigate(isStaff ? `/admin/reports/${n.reference_id}` : `/reports/${n.reference_id}`);
+        return;
+      }
+      navigate(isStaff ? '/admin/reports' : '/my-reports');
+    }
+  };
 
   if (loading) {
     return (
@@ -179,7 +192,7 @@ export default function NotificationsPage() {
           {filtered.map((n) => (
             <button
               key={n.id}
-              onClick={() => !n.is_read && markAsRead(n.id)}
+              onClick={() => openNotification(n)}
               className={cn(
                 'w-full text-left flex items-start gap-4 p-4 rounded-xl border transition-colors',
                 n.is_read
