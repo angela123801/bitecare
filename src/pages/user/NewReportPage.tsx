@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { validateImage, uploadBitePhoto } from '@/lib/storage';
 import type { Barangay, AnimalType, WoundType, ExposureCategory } from '@/types';
 import { ANIMAL_TYPE_LABELS, CATEGORY_LABELS } from '@/config/constants';
-import { cn } from '@/lib/utils';
+import { cn, getErrorMessage } from '@/lib/utils';
 import {
   ChevronLeft, ChevronRight, Loader2, CheckCircle2, User, PawPrint,
   MapPin, ClipboardCheck, AlertCircle, Camera, MapPinned, X, Crosshair,
@@ -25,7 +25,7 @@ const WOUND_LABELS: Record<WoundType, string> = {
 interface FormData {
   patient_name: string; patient_age: string; patient_sex: string;
   patient_phone: string; patient_address: string; patient_barangay_id: string;
-  bite_date: string; bite_time: string; animal_type: string; animal_status: string;
+  bite_date: string; bite_time: string; animal_type: string; animal_type_other: string; animal_status: string;
   animal_vaccinated: string; bite_site: string; wound_type: string; category: string;
   number_of_wounds: string; provoked: boolean; first_aid_given: boolean;
   first_aid_details: string; incident_location: string; incident_barangay_id: string;
@@ -36,7 +36,7 @@ const init: FormData = {
   patient_name: '', patient_age: '', patient_sex: '', patient_phone: '',
   patient_address: '', patient_barangay_id: '',
   bite_date: new Date().toISOString().split('T')[0], bite_time: '',
-  animal_type: '', animal_status: '', animal_vaccinated: 'unknown',
+  animal_type: '', animal_type_other: '', animal_status: '', animal_vaccinated: 'unknown',
   bite_site: '', wound_type: '', category: '', number_of_wounds: '1',
   provoked: false, first_aid_given: false, first_aid_details: '',
   incident_location: '', incident_barangay_id: '',
@@ -70,7 +70,10 @@ export default function NewReportPage() {
   const [geoLoading, setGeoLoading] = useState(false);
 
   useEffect(() => {
-    supabase.from('barangays').select('*').order('name').then(({ data }) => { if (data) setBrgy(data); });
+    supabase.from('barangays').select('*').order('name').then(({ data, error }) => {
+      if (error) { setError(getErrorMessage(error, 'Failed to load barangays')); return; }
+      if (data) setBrgy(data);
+    });
   }, []);
 
   // Clean up preview URLs on unmount
@@ -129,6 +132,7 @@ export default function NewReportPage() {
     } else if (step === 1) {
       if (!f.bite_date) e.bite_date = 'Required';
       if (!f.animal_type) e.animal_type = 'Required';
+      if (f.animal_type === 'other' && !f.animal_type_other.trim()) e.animal_type_other = 'Required';
       if (!f.wound_type) e.wound_type = 'Required';
       if (!f.category) e.category = 'Required';
       if (!f.bite_site.trim()) e.bite_site = 'Required';
@@ -158,50 +162,57 @@ export default function NewReportPage() {
     if (!user) return;
     setSubmitting(true); setError('');
 
-    const { data: report, error: err } = await supabase.from('bite_reports').insert({
-      reporter_id: user.id, patient_name: f.patient_name.trim(),
-      patient_age: f.patient_age ? Number(f.patient_age) : null,
-      patient_sex: f.patient_sex || null, patient_phone: f.patient_phone.trim(),
-      patient_address: f.patient_address.trim(),
-      patient_barangay_id: f.patient_barangay_id || null,
-      bite_date: f.bite_date, bite_time: f.bite_time || null,
-      animal_type: f.animal_type, animal_status: f.animal_status || 'unknown',
-      animal_vaccinated: f.animal_vaccinated, bite_site: f.bite_site.trim(),
-      wound_type: f.wound_type, category: f.category,
-      number_of_wounds: Number(f.number_of_wounds) || 1,
-      provoked: f.provoked, first_aid_given: f.first_aid_given,
-      first_aid_details: f.first_aid_details.trim(),
-      incident_location: f.incident_location.trim(),
-      incident_barangay_id: f.incident_barangay_id || null,
-      incident_latitude: f.incident_latitude ? Number(f.incident_latitude) : null,
-      incident_longitude: f.incident_longitude ? Number(f.incident_longitude) : null,
-      status: 'reported' as const,
-    }).select('id').single();
+    try {
+      const { data: report, error: err } = await supabase.from('bite_reports').insert({
+        reporter_id: user.id, patient_name: f.patient_name.trim(),
+        patient_age: f.patient_age ? Number(f.patient_age) : null,
+        patient_sex: f.patient_sex || null, patient_phone: f.patient_phone.trim(),
+        patient_address: f.patient_address.trim(),
+        patient_barangay_id: f.patient_barangay_id || null,
+        bite_date: f.bite_date, bite_time: f.bite_time || null,
+        animal_type: f.animal_type, animal_type_other: f.animal_type_other.trim(),
+        animal_status: f.animal_status || 'unknown',
+        animal_vaccinated: f.animal_vaccinated, bite_site: f.bite_site.trim(),
+        wound_type: f.wound_type, category: f.category,
+        number_of_wounds: Number(f.number_of_wounds) || 1,
+        provoked: f.provoked, first_aid_given: f.first_aid_given,
+        first_aid_details: f.first_aid_details.trim(),
+        incident_location: f.incident_location.trim(),
+        incident_barangay_id: f.incident_barangay_id || null,
+        incident_latitude: f.incident_latitude ? Number(f.incident_latitude) : null,
+        incident_longitude: f.incident_longitude ? Number(f.incident_longitude) : null,
+        status: 'reported' as const,
+      }).select('id').single();
 
-    if (err || !report) { setError(err?.message ?? 'Failed to create report'); setSubmitting(false); return; }
+      if (err || !report) { setError(err?.message ?? 'Failed to create report'); return; }
 
-    // Upload photos
-    if (photos.length > 0) {
-      try {
-        const uploads = await Promise.all(
-          photos.map((file) => uploadBitePhoto(user.id, report.id, file)),
-        );
-        const photoRows = uploads.map((u, i) => ({
-          report_id: report.id,
-          storage_path: u.path,
-          file_name: photos[i].name,
-          file_size: photos[i].size,
-          mime_type: photos[i].type,
-          uploaded_by: user.id,
-        }));
-        await supabase.from('bite_report_photos').insert(photoRows);
-      } catch (uploadErr) {
-        console.error('Photo upload error:', uploadErr);
-        // Report was created — continue to navigate, photos can be added later
+      // Upload photos (non-fatal: the report already exists)
+      if (photos.length > 0) {
+        try {
+          const uploads = await Promise.all(
+            photos.map((file) => uploadBitePhoto(user.id, report.id, file)),
+          );
+          const photoRows = uploads.map((u, i) => ({
+            report_id: report.id,
+            storage_path: u.path,
+            file_name: photos[i].name,
+            file_size: photos[i].size,
+            mime_type: photos[i].type,
+            uploaded_by: user.id,
+          }));
+          const { error: photoErr } = await supabase.from('bite_report_photos').insert(photoRows);
+          if (photoErr) console.error('Photo record insert failed:', getErrorMessage(photoErr));
+        } catch (uploadErr) {
+          console.error('Photo upload error:', getErrorMessage(uploadErr));
+        }
       }
-    }
 
-    navigate('/my-reports', { replace: true });
+      navigate('/my-reports', { replace: true });
+    } catch (submitErr) {
+      setError(getErrorMessage(submitErr, 'Failed to submit report. Please try again.'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -273,6 +284,13 @@ export default function NewReportPage() {
                   {Object.entries(ANIMAL_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select><Err k="animal_type" />
               </div>
+              {f.animal_type === 'other' && (
+                <div className="sm:col-span-2">
+                  <Label text="Specify Animal" req />
+                  <input className="input-field" value={f.animal_type_other} onChange={(e) => set('animal_type_other', e.target.value)} placeholder="e.g. snake, monkey" />
+                  <Err k="animal_type_other" />
+                </div>
+              )}
               <div>
                 <Label text="Animal Status" />
                 <select className="input-field" value={f.animal_status} onChange={(e) => set('animal_status', e.target.value)}>
@@ -397,7 +415,7 @@ export default function NewReportPage() {
             <div className="card p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">Incident</h3>
               <Row label="Date / Time" value={`${f.bite_date} ${f.bite_time || ''}`} />
-              <Row label="Animal" value={f.animal_type ? ANIMAL_TYPE_LABELS[f.animal_type as AnimalType] : '—'} />
+              <Row label="Animal" value={f.animal_type === 'other' && f.animal_type_other ? f.animal_type_other : f.animal_type ? ANIMAL_TYPE_LABELS[f.animal_type as AnimalType] : '—'} />
               <Row label="Animal Status" value={f.animal_status} />
               <Row label="Vaccinated" value={f.animal_vaccinated} />
               <Row label="Bite Site" value={f.bite_site} />

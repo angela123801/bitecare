@@ -1,19 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import type { Barangay, UserRole } from '@/types';
-import { Eye, EyeOff, Loader2, ChevronDown, AlertCircle, User, ShieldCheck, Stethoscope, Shield } from 'lucide-react';
-
-const ROLE_OPTIONS: { value: UserRole; label: string; description: string; icon: React.ElementType; color: string }[] = [
-  { value: 'user', label: 'User Account', description: 'Report incidents and track vaccinations', icon: User, color: 'bg-blue-50 border-blue-200 text-blue-700' },
-  { value: 'health_worker', label: 'Health Worker Account', description: 'Manage cases and administer vaccines', icon: Stethoscope, color: 'bg-teal-50 border-teal-200 text-teal-700' },
-  { value: 'admin', label: 'Admin Account', description: 'Manage users, facilities, and reports', icon: ShieldCheck, color: 'bg-amber-50 border-amber-200 text-amber-700' },
-  { value: 'super_admin', label: 'Super Admin Account', description: 'Full system access and analytics', icon: Shield, color: 'bg-red-50 border-red-200 text-red-700' },
-];
+import type { Barangay } from '@/types';
+import { getErrorMessage } from '@/lib/utils';
+import { Eye, EyeOff, Loader2, ChevronDown, AlertCircle } from 'lucide-react';
 
 export default function RegisterPage() {
-  const { signUp } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({
     fullName: '',
@@ -22,7 +14,6 @@ export default function RegisterPage() {
     confirmPassword: '',
     phone: '',
     barangayId: '',
-    role: 'user' as UserRole,
   });
   const [barangays, setBarangays] = useState<Barangay[]>([]);
   const [showPassword, setShowPassword] = useState(false);
@@ -30,7 +21,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    supabase.from('barangays').select('*').order('name').then(({ data }) => {
+    supabase.from('barangays').select('*').order('name').then(({ data, error }) => {
+      if (error) { setError(getErrorMessage(error, 'Failed to load barangays')); return; }
       if (data) setBarangays(data);
     });
   }, []);
@@ -56,33 +48,32 @@ export default function RegisterPage() {
         options: {
           data: {
             full_name: form.fullName.trim(),
-            role: form.role,
+            role: 'user',
           },
         },
       });
       if (signUpError) throw signUpError;
 
       const { data: userData } = await supabase.auth.getUser();
-      if (userData.user) {
-        await supabase
+      if (userData.user && (form.phone || form.barangayId)) {
+        const { error: profileError } = await supabase
           .from('profiles')
           .update({
             phone: form.phone || '',
             barangay_id: form.barangayId || null,
           })
           .eq('id', userData.user.id);
+        if (profileError) throw profileError;
       }
 
       navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Registration failed';
+      const msg = getErrorMessage(err, 'Registration failed');
       setError(msg.includes('already registered') ? 'An account with this email already exists' : msg);
     } finally {
       setLoading(false);
     }
   };
-
-  const selectedRole = ROLE_OPTIONS.find((r) => r.value === form.role)!;
 
   return (
     <div
@@ -120,33 +111,6 @@ export default function RegisterPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Account Type */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Account type</label>
-              <div className="grid grid-cols-2 gap-2">
-                {ROLE_OPTIONS.map((opt) => {
-                  const Icon = opt.icon;
-                  const isActive = form.role === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setForm((f) => ({ ...f, role: opt.value }))}
-                      className={`relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center ${
-                        isActive
-                          ? `${opt.color} border-current ring-2 ring-current/20`
-                          : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-gray-300 hover:bg-gray-100'
-                      }`}
-                    >
-                      <Icon className="w-5 h-5" />
-                      <span className="text-xs font-semibold leading-tight">{opt.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="text-xs text-gray-400 mt-1.5">{selectedRole.description}</p>
-            </div>
-
             <div>
               <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">Full name</label>
               <input id="fullName" type="text" value={form.fullName} onChange={set('fullName')} className="input-field" placeholder="Juan Dela Cruz" required />

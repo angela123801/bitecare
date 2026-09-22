@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { VACCINATION_STATUS_LABELS, VACCINATION_STATUS_COLORS, ESSEN_REGIMEN_DAYS } from '@/config/constants';
-import { formatDate } from '@/lib/utils';
+import { formatDate, getErrorMessage } from '@/lib/utils';
 import type { VaccinationRecord, BiteReport } from '@/types';
-import { Syringe, Loader2, Search, Plus, X, Inbox, Check, Calendar } from 'lucide-react';
+import { Loader2, Search, Plus, X, Inbox, Check } from 'lucide-react';
 
 export default function VaccinationManagementPage() {
   const { isRoleAtLeast } = useAuth();
@@ -18,20 +18,23 @@ export default function VaccinationManagementPage() {
   const [reports, setReports] = useState<BiteReport[]>([]);
   const [form, setForm] = useState({ report_id: '', vaccine_type: 'PVRV', generateSchedule: true });
 
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => { loadRecords(); }, []);
 
-  async function fetch() {
+  async function loadRecords() {
     setLoading(true);
-    const { data } = await supabase
+    setError('');
+    const { data, error: err } = await supabase
       .from('vaccination_records')
       .select('*, report:bite_reports(id, patient_name, category)')
       .order('scheduled_date', { ascending: true });
-    setRecords((data as unknown as (VaccinationRecord & { report?: BiteReport })[]) ?? []);
+    if (err) { setError(getErrorMessage(err, 'Unable to load vaccination records.')); setRecords([]); }
+    else setRecords((data as unknown as (VaccinationRecord & { report?: BiteReport })[]) ?? []);
     setLoading(false);
   }
 
   async function fetchReports() {
-    const { data } = await supabase.from('bite_reports').select('id, patient_name, category').order('created_at', { ascending: false });
+    const { data, error: err } = await supabase.from('bite_reports').select('id, patient_name, category').order('created_at', { ascending: false });
+    if (err) { setError(getErrorMessage(err, 'Unable to load reports.')); return; }
     setReports((data as BiteReport[]) ?? []);
   }
 
@@ -58,22 +61,25 @@ export default function VaccinationManagementPage() {
     });
 
     const { error: err } = await supabase.from('vaccination_records').insert(recs);
-    if (err) { setError(err.message); } else { setShowForm(false); fetch(); }
+    if (err) { setError(getErrorMessage(err, 'Failed to generate schedule')); }
+    else { setShowForm(false); setForm({ report_id: '', vaccine_type: 'PVRV', generateSchedule: true }); loadRecords(); }
     setSaving(false);
   }
 
   async function markCompleted(id: string) {
-    await supabase.from('vaccination_records').update({
+    const { error: err } = await supabase.from('vaccination_records').update({
       status: 'completed',
       administered_date: new Date().toISOString().split('T')[0],
       updated_at: new Date().toISOString(),
     }).eq('id', id);
-    fetch();
+    if (err) { setError(getErrorMessage(err, 'Failed to update record')); return; }
+    loadRecords();
   }
 
   async function markMissed(id: string) {
-    await supabase.from('vaccination_records').update({ status: 'missed', updated_at: new Date().toISOString() }).eq('id', id);
-    fetch();
+    const { error: err } = await supabase.from('vaccination_records').update({ status: 'missed', updated_at: new Date().toISOString() }).eq('id', id);
+    if (err) { setError(getErrorMessage(err, 'Failed to update record')); return; }
+    loadRecords();
   }
 
   const filtered = records.filter(r => {
@@ -126,6 +132,10 @@ export default function VaccinationManagementPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {error && !showForm && (
+        <div className="p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm">{error}</div>
       )}
 
       <div className="flex flex-col sm:flex-row gap-3">

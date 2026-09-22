@@ -12,16 +12,19 @@ export default function AppointmentsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>('all');
 
-  useEffect(() => { fetch(); }, []);
+  const [error, setError] = useState('');
 
-  async function fetch() {
+  useEffect(() => { loadAppointments(); }, []);
+
+  async function loadAppointments() {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error: err } = await supabase
       .from('vaccination_records')
       .select('*')
       .in('status', ['scheduled', 'rescheduled'])
       .order('scheduled_date', { ascending: true });
-    setRecords((data as VaccinationRecord[]) ?? []);
+    if (err) { setError(err.message); }
+    else { setRecords((data as VaccinationRecord[]) ?? []); }
     setLoading(false);
   }
 
@@ -38,13 +41,15 @@ export default function AppointmentsPage() {
   const overdueCount = records.filter(r => r.scheduled_date < today).length;
 
   async function markCompleted(id: string) {
-    await supabase.from('vaccination_records').update({ status: 'completed', administered_date: today, updated_at: new Date().toISOString() }).eq('id', id);
-    fetch();
+    const { error: err } = await supabase.from('vaccination_records').update({ status: 'completed', administered_date: today, updated_at: new Date().toISOString() }).eq('id', id);
+    if (err) { setError(err.message); return; }
+    loadAppointments();
   }
 
   async function markMissed(id: string) {
-    await supabase.from('vaccination_records').update({ status: 'missed', updated_at: new Date().toISOString() }).eq('id', id);
-    fetch();
+    const { error: err } = await supabase.from('vaccination_records').update({ status: 'missed', updated_at: new Date().toISOString() }).eq('id', id);
+    if (err) { setError(err.message); return; }
+    loadAppointments();
   }
 
   const filters: { key: FilterType; label: string; count?: number }[] = [
@@ -60,6 +65,10 @@ export default function AppointmentsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Appointments</h1>
         <p className="text-sm text-gray-500 mt-1">Upcoming vaccination appointments</p>
       </div>
+
+      {error && (
+        <div className="p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm">{error}</div>
+      )}
 
       {overdueCount > 0 && (
         <div className="bg-danger-50 border border-danger-200 rounded-xl p-4 flex items-center gap-3">

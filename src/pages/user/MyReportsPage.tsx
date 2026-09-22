@@ -10,7 +10,7 @@ import {
   SEVERITY_LABELS,
   ANIMAL_TYPE_LABELS,
 } from '@/config/constants';
-import { formatDate, cn } from '@/lib/utils';
+import { formatDate, cn, getErrorMessage } from '@/lib/utils';
 import {
   Loader2,
   PawPrint,
@@ -36,12 +36,14 @@ export default function MyReportsPage() {
   const { user } = useAuth();
   const [reports, setReports] = useState<BiteReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState<'' | ReportStatus>('');
 
   useEffect(() => {
     if (!user) return;
     const fetchReports = async () => {
       setLoading(true);
+      setError('');
       let query = supabase
         .from('bite_reports')
         .select('*')
@@ -52,8 +54,9 @@ export default function MyReportsPage() {
         query = query.eq('status', statusFilter);
       }
 
-      const { data } = await query;
-      setReports((data as BiteReport[]) ?? []);
+      const { data, error: err } = await query;
+      if (err) { setError(getErrorMessage(err, 'Unable to load your reports.')); setReports([]); }
+      else setReports((data as BiteReport[]) ?? []);
       setLoading(false);
     };
     fetchReports();
@@ -64,13 +67,23 @@ export default function MyReportsPage() {
       <div className="w-20 h-20 rounded-full bg-primary-50 flex items-center justify-center mb-4">
         <FileText className="w-10 h-10 text-primary-400" />
       </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-1">No reports yet</h3>
+      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+        {statusFilter ? 'No reports match this filter' : 'No reports yet'}
+      </h3>
       <p className="text-gray-500 text-sm mb-6 max-w-sm">
-        You haven't submitted any bite reports. If you or someone you know has been bitten, file a report to get help.
+        {statusFilter
+          ? 'You have no reports with this status. Try a different filter.'
+          : "You haven't submitted any bite reports. If you or someone you know has been bitten, file a report to get help."}
       </p>
-      <Link to="/reports/new" className="btn-primary flex items-center gap-2">
-        <Plus className="w-4 h-4" /> New Report
-      </Link>
+      {statusFilter ? (
+        <button onClick={() => setStatusFilter('')} className="btn-secondary flex items-center gap-2">
+          Clear filter
+        </button>
+      ) : (
+        <Link to="/reports/new" className="btn-primary flex items-center gap-2">
+          <Plus className="w-4 h-4" /> New Report
+        </Link>
+      )}
     </div>
   );
 
@@ -98,6 +111,12 @@ export default function MyReportsPage() {
           ))}
         </select>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm">
+          {error}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-20">

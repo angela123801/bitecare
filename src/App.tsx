@@ -5,6 +5,7 @@ import AppLayout from '@/components/layout/AppLayout';
 
 import LoginPage from '@/pages/auth/LoginPage';
 import RegisterPage from '@/pages/auth/RegisterPage';
+import ResetPasswordPage from '@/pages/auth/ResetPasswordPage';
 import DashboardPage from '@/pages/shared/DashboardPage';
 import ProfilePage from '@/pages/shared/ProfilePage';
 import NotificationsPage from '@/pages/shared/NotificationsPage';
@@ -32,6 +33,7 @@ export default function App() {
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* Protected */}
           <Route

@@ -57,6 +57,17 @@ export function truncate(str: string, len: number): string {
   return str.slice(0, len) + '...';
 }
 
+export function getErrorMessage(err: unknown, fallback = 'Something went wrong'): string {
+  if (!err) return fallback;
+  if (typeof err === 'string') return err;
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === 'object' && 'message' in err) {
+    const msg = (err as { message?: unknown }).message;
+    if (typeof msg === 'string' && msg) return msg;
+  }
+  return fallback;
+}
+
 export function isRoleAtLeast(
   role: string,
   minimum: string,

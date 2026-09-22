@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { EducationContent } from '@/types';
-import { BookOpen, Plus, Loader2, X, Pencil, Trash2, Eye, EyeOff, Inbox } from 'lucide-react';
+import { getErrorMessage } from '@/lib/utils';
+import { Plus, Loader2, X, Pencil, Trash2, Eye, EyeOff, Inbox } from 'lucide-react';
 
 export default function EducationManagementPage() {
   const [articles, setArticles] = useState<EducationContent[]>([]);
@@ -16,12 +17,13 @@ export default function EducationManagementPage() {
     return { title: '', slug: '', category: 'general', content: '', summary: '', is_published: false };
   }
 
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => { loadArticles(); }, []);
 
-  async function fetch() {
+  async function loadArticles() {
     setLoading(true);
-    const { data } = await supabase.from('education_content').select('*').order('sort_order');
-    setArticles((data as EducationContent[]) ?? []);
+    const { data, error: err } = await supabase.from('education_content').select('*').order('sort_order');
+    if (err) { setError(getErrorMessage(err, 'Unable to load articles.')); setArticles([]); }
+    else setArticles((data as EducationContent[]) ?? []);
     setLoading(false);
   }
 
@@ -46,19 +48,21 @@ export default function EducationManagementPage() {
       ({ error: err } = await supabase.from('education_content').insert({ ...payload, sort_order: articles.length }));
     }
 
-    if (err) { setError(err.message); } else { setShowForm(false); setEditing(null); setForm(defaultForm()); fetch(); }
+    if (err) { setError(err.message); } else { setShowForm(false); setEditing(null); setForm(defaultForm()); loadArticles(); }
     setSaving(false);
   }
 
   async function togglePublish(a: EducationContent) {
-    await supabase.from('education_content').update({ is_published: !a.is_published }).eq('id', a.id);
-    fetch();
+    const { error: err } = await supabase.from('education_content').update({ is_published: !a.is_published }).eq('id', a.id);
+    if (err) { setError(err.message); return; }
+    loadArticles();
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this article?')) return;
-    await supabase.from('education_content').delete().eq('id', id);
-    fetch();
+    const { error: err } = await supabase.from('education_content').delete().eq('id', id);
+    if (err) { setError(err.message); return; }
+    loadArticles();
   }
 
   const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -74,6 +78,10 @@ export default function EducationManagementPage() {
           <Plus className="w-4 h-4" /> Add Article
         </button>
       </div>
+
+      {error && !showForm && (
+        <div className="p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm">{error}</div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -91,7 +99,7 @@ export default function EducationManagementPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                 <select value={form.category} onChange={set('category')} className="input-field">
-                  {categories.map(c => <option key={c} value={c}>{c.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>)}
+                  {categories.map(c => <option key={c} value={c}>{c.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</option>)}
                 </select>
               </div>
               <div>
@@ -134,7 +142,7 @@ export default function EducationManagementPage() {
               {articles.map(a => (
                 <tr key={a.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{a.title}</td>
-                  <td className="px-4 py-3 text-gray-600 capitalize">{a.category.replace('_', ' ')}</td>
+                  <td className="px-4 py-3 text-gray-600 capitalize">{a.category.replace(/_/g, ' ')}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${a.is_published ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-600'}`}>
                       {a.is_published ? 'Published' : 'Draft'}

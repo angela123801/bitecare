@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { cn } from '@/lib/utils';
+import { cn, getErrorMessage } from '@/lib/utils';
 import type { FirstAidGuide, ExposureCategory } from '@/types';
 import { CATEGORY_LABELS } from '@/config/constants';
 import {
@@ -41,7 +41,7 @@ export default function FirstAidPage() {
       if (fetchErr) throw fetchErr;
       setGuides((data as FirstAidGuide[]) || []);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load guides');
+      setError(getErrorMessage(err, 'Failed to load guides'));
     } finally {
       setLoading(false);
     }

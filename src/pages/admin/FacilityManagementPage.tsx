@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FACILITY_TYPE_LABELS } from '@/config/constants';
+import { getErrorMessage } from '@/lib/utils';
 import type { HealthcareFacility, Barangay } from '@/types';
-import { Building2, Plus, Loader2, MapPin, Phone, Clock, X, Pencil, Inbox } from 'lucide-react';
+import { Plus, Loader2, MapPin, Phone, Clock, X, Pencil, Inbox } from 'lucide-react';
 
 export default function FacilityManagementPage() {
   const [facilities, setFacilities] = useState<HealthcareFacility[]>([]);
@@ -18,17 +19,19 @@ export default function FacilityManagementPage() {
     return { name: '', type: 'animal_bite_center', address: '', barangay_id: '', latitude: '10.6840', longitude: '122.9740', phone: '', email: '', operating_hours: '', services: '' };
   }
 
-  useEffect(() => { fetch(); fetchBarangays(); }, []);
+  useEffect(() => { loadFacilities(); fetchBarangays(); }, []);
 
-  async function fetch() {
+  async function loadFacilities() {
     setLoading(true);
-    const { data } = await supabase.from('healthcare_facilities').select('*, barangay:barangays(name)').order('name');
-    setFacilities((data as unknown as HealthcareFacility[]) ?? []);
+    const { data, error: err } = await supabase.from('healthcare_facilities').select('*, barangay:barangays(name)').order('name');
+    if (err) { setError(getErrorMessage(err, 'Unable to load facilities.')); setFacilities([]); }
+    else setFacilities((data as unknown as HealthcareFacility[]) ?? []);
     setLoading(false);
   }
 
   async function fetchBarangays() {
-    const { data } = await supabase.from('barangays').select('*').order('name');
+    const { data, error: err } = await supabase.from('barangays').select('*').order('name');
+    if (err) { setError(getErrorMessage(err, 'Unable to load barangays.')); return; }
     setBarangays((data as Barangay[]) ?? []);
   }
 
@@ -67,7 +70,7 @@ export default function FacilityManagementPage() {
     }
 
     if (err) { setError(err.message); }
-    else { setShowForm(false); setEditing(null); setForm(defaultForm()); fetch(); }
+    else { setShowForm(false); setEditing(null); setForm(defaultForm()); loadFacilities(); }
     setSaving(false);
   }
 
@@ -85,6 +88,10 @@ export default function FacilityManagementPage() {
           <Plus className="w-4 h-4" /> Add Facility
         </button>
       </div>
+
+      {error && !showForm && (
+        <div className="p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm">{error}</div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

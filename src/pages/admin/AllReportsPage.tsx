@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { REPORT_STATUS_LABELS, REPORT_STATUS_COLORS, SEVERITY_LABELS, SEVERITY_COLORS, ANIMAL_TYPE_LABELS } from '@/config/constants';
-import { formatDate } from '@/lib/utils';
-import type { BiteReport, ReportStatus } from '@/types';
-import { FileText, Search, Loader2, Filter, ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
+import { formatDate, getErrorMessage } from '@/lib/utils';
+import type { BiteReport } from '@/types';
+import { Search, Loader2, Filter, ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
 
 const PAGE_SIZE = 20;
 
@@ -15,13 +15,22 @@ export default function AllReportsPage() {
   const [page, setPage] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchReports();
   }, [page, statusFilter, search]);
 
+  // Debounce the search box so we query once the user pauses typing.
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(0); }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
   async function fetchReports() {
     setLoading(true);
+    setError('');
     let query = supabase
       .from('bite_reports')
       .select('*, reporter:profiles!bite_reports_reporter_id_fkey(full_name, email)', { count: 'exact' })
@@ -31,11 +40,9 @@ export default function AllReportsPage() {
     if (statusFilter !== 'all') query = query.eq('status', statusFilter);
     if (search) query = query.ilike('patient_name', `%${search}%`);
 
-    const { data, count, error } = await query;
-    if (!error) {
-      setReports((data as unknown as BiteReport[]) ?? []);
-      setTotal(count ?? 0);
-    }
+    const { data, count, error: err } = await query;
+    if (err) { setError(getErrorMessage(err, 'Unable to load reports.')); setReports([]); setTotal(0); }
+    else { setReports((data as unknown as BiteReport[]) ?? []); setTotal(count ?? 0); }
     setLoading(false);
   }
 
@@ -56,8 +63,8 @@ export default function AllReportsPage() {
           <input
             type="text"
             placeholder="Search by patient name..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="input-field pl-9"
           />
         </div>
@@ -75,6 +82,10 @@ export default function AllReportsPage() {
           </select>
         </div>
       </div>
+
+      {error && (
+        <div className="p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm">{error}</div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-12">

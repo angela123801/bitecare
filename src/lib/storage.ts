@@ -12,11 +12,15 @@ export function validateImage(file: File): string | null {
 }
 
 export async function uploadAvatar(userId: string, file: File): Promise<string> {
+  // Returns the storage object path (avatars bucket is private; resolve a signed URL to display).
   const error = validateImage(file);
   if (error) throw new Error(error);
 
   const ext = file.name.split('.').pop();
-  const path = `${userId}/avatar.${ext}`;
+  const unique = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const path = `${userId}/avatar-${unique}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from('avatars')
@@ -24,8 +28,8 @@ export async function uploadAvatar(userId: string, file: File): Promise<string> 
 
   if (uploadError) throw uploadError;
 
-  const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-  return data.publicUrl;
+  // Bucket is private; store the object path. UI resolves a signed URL on read.
+  return path;
 }
 
 export async function uploadBitePhoto(
@@ -37,7 +41,10 @@ export async function uploadBitePhoto(
   if (error) throw new Error(error);
 
   const ext = file.name.split('.').pop();
-  const fileName = `${Date.now()}.${ext}`;
+  const unique = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const fileName = `${unique}.${ext}`;
   const path = `${userId}/${reportId}/${fileName}`;
 
   const { error: uploadError } = await supabase.storage

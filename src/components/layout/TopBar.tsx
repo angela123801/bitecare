@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { cn, getInitials } from '@/lib/utils';
+import { cn, getInitials, getErrorMessage } from '@/lib/utils';
+import { getSignedUrl } from '@/lib/storage';
 import { ROLE_LABELS } from '@/config/constants';
 import {
   Bell,
@@ -21,7 +22,20 @@ export default function TopBar({ onMenuClick, unreadCount }: TopBarProps) {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (profile?.avatar_url) {
+      getSignedUrl('avatars', profile.avatar_url)
+        .then((url) => { if (active) setAvatarUrl(url); })
+        .catch((err) => { if (active) { setAvatarUrl(''); console.error('Avatar load failed:', getErrorMessage(err)); } });
+    } else {
+      setAvatarUrl('');
+    }
+    return () => { active = false; };
+  }, [profile?.avatar_url]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -71,9 +85,9 @@ export default function TopBar({ onMenuClick, unreadCount }: TopBarProps) {
             className="flex items-center gap-2 p-1.5 pr-3 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-semibold">
-              {profile?.avatar_url ? (
+              {avatarUrl ? (
                 <img
-                  src={profile.avatar_url}
+                  src={avatarUrl}
                   alt=""
                   className="w-full h-full rounded-full object-cover"
                 />

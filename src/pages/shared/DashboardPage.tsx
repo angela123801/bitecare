@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { formatRelativeTime } from '@/lib/utils';
+import { formatRelativeTime, getErrorMessage } from '@/lib/utils';
 import { ROLE_LABELS, REPORT_STATUS_LABELS, REPORT_STATUS_COLORS, SEVERITY_COLORS } from '@/config/constants';
 import type { BiteReport, UserRole } from '@/types';
 import {
@@ -27,20 +27,26 @@ import {
 /* ------------------------------------------------------------------ */
 /*  Stats Card                                                        */
 /* ------------------------------------------------------------------ */
-function StatsCard({ label, value, icon, color }: { label: string; value: number | string; icon: React.ReactNode; color: string }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-500 font-medium">{label}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-        </div>
-        <div className={`w-11 h-11 rounded-lg flex items-center justify-center ${color}`}>
-          {icon}
-        </div>
+function StatsCard({ label, value, icon, color, to }: { label: string; value: number | string; icon: React.ReactNode; color: string; to?: string }) {
+  const body = (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm text-gray-500 font-medium">{label}</p>
+        <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+      </div>
+      <div className={`w-11 h-11 rounded-lg flex items-center justify-center ${color}`}>
+        {icon}
       </div>
     </div>
   );
+  if (to) {
+    return (
+      <Link to={to} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 block hover:border-teal-300 hover:shadow-md transition-all">
+        {body}
+      </Link>
+    );
+  }
+  return <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">{body}</div>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -107,6 +113,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Record<string, number>>({});
   const [reports, setReports] = useState<BiteReport[]>([]);
+
+  const [error, setError] = useState('');
 
   const role: UserRole = profile?.role ?? 'user';
   const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
@@ -175,6 +183,8 @@ export default function DashboardPage() {
         }
 
         if (!cancelled) setStats(s);
+      } catch (err: unknown) {
+        if (!cancelled) setError(getErrorMessage(err, 'Failed to load dashboard'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -189,6 +199,16 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-20">
+        <AlertTriangle className="w-12 h-12 text-danger-400 mx-auto mb-3" />
+        <p className="text-danger-600 font-medium">{error}</p>
+        <button className="btn-secondary mt-4" onClick={() => window.location.reload()}>Retry</button>
       </div>
     );
   }
@@ -213,7 +233,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {role === 'user' && (
           <>
-            <StatsCard label="My Reports" value={stats.myReports ?? 0} icon={<FileText className="w-5 h-5 text-white" />} color="bg-teal-600" />
+            <StatsCard label="My Reports" value={stats.myReports ?? 0} icon={<FileText className="w-5 h-5 text-white" />} color="bg-teal-600" to="/my-reports" />
             <StatsCard label="Active Cases" value={stats.activeCases ?? 0} icon={<AlertTriangle className="w-5 h-5 text-white" />} color="bg-amber-500" />
             <StatsCard label="Upcoming Vaccinations" value={stats.upcomingVaccinations ?? 0} icon={<Syringe className="w-5 h-5 text-white" />} color="bg-sky-500" />
           </>
@@ -227,10 +247,10 @@ export default function DashboardPage() {
         )}
         {(role === 'admin' || role === 'super_admin') && (
           <>
-            <StatsCard label="Total Reports" value={stats.totalReports ?? 0} icon={<FileText className="w-5 h-5 text-white" />} color="bg-teal-600" />
+            <StatsCard label="Total Reports" value={stats.totalReports ?? 0} icon={<FileText className="w-5 h-5 text-white" />} color="bg-teal-600" to="/admin/reports" />
             <StatsCard label="Pending Reports" value={stats.pendingReports ?? 0} icon={<AlertTriangle className="w-5 h-5 text-white" />} color="bg-amber-500" />
             <StatsCard label="Active Cases" value={stats.activeCases ?? 0} icon={<Activity className="w-5 h-5 text-white" />} color="bg-sky-500" />
-            <StatsCard label="Total Users" value={stats.totalUsers ?? 0} icon={<Users className="w-5 h-5 text-white" />} color="bg-blue-600" />
+            <StatsCard label="Total Users" value={stats.totalUsers ?? 0} icon={<Users className="w-5 h-5 text-white" />} color="bg-blue-600" to="/admin/users" />
             {role === 'super_admin' && (
               <>
                 <StatsCard label="Healthcare Facilities" value={stats.totalFacilities ?? 0} icon={<Building2 className="w-5 h-5 text-white" />} color="bg-teal-500" />

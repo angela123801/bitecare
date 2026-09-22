@@ -21,13 +21,15 @@ export default function AppLayout() {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .eq('is_read', false);
-    setUnreadCount(count ?? 0);
+    return count ?? 0;
   }, [user]);
 
   useEffect(() => {
-    fetchUnread();
-    const interval = setInterval(fetchUnread, 30000);
-    return () => clearInterval(interval);
+    let mounted = true;
+    const load = () => fetchUnread().then(c => { if (mounted && c !== undefined) setUnreadCount(c); });
+    load();
+    const interval = setInterval(load, 30000);
+    return () => { mounted = false; clearInterval(interval); };
   }, [fetchUnread]);
 
   return (

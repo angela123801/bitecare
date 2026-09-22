@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ANIMAL_TYPE_LABELS, SEVERITY_LABELS } from '@/config/constants';
-import { BarChart3, Loader2, FileText, Users, Building2, Syringe, TrendingUp } from 'lucide-react';
+import { Loader2, FileText, Users, Building2, TrendingUp } from 'lucide-react';
 
 interface Stats {
   totalReports: number;
@@ -19,9 +19,12 @@ export default function AnalyticsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [error, setError] = useState('');
+
   useEffect(() => { fetchStats(); }, []);
 
   async function fetchStats() {
+    setError('');
     const [reports, users, facilities, vaccinations] = await Promise.all([
       supabase.from('bite_reports').select('status, severity, animal_type, incident_barangay_id, created_at'),
       supabase.from('profiles').select('id', { count: 'exact', head: true }),
@@ -59,6 +62,18 @@ export default function AnalyticsPage() {
     const completed = allVacc.filter(v => v.status === 'completed').length;
     const vaccinationRate = allVacc.length > 0 ? Math.round((completed / allVacc.length) * 100) : 0;
 
+    if (reports.error || vaccinations.error || users.error || facilities.error) {
+      setError(
+        reports.error?.message ||
+        vaccinations.error?.message ||
+        users.error?.message ||
+        facilities.error?.message ||
+        'Failed to load analytics'
+      );
+      setLoading(false);
+      return;
+    }
+
     setStats({
       totalReports: allReports.length,
       thisMonth: allReports.filter(r => r.created_at >= monthStart).length,
@@ -71,6 +86,7 @@ export default function AnalyticsPage() {
   }
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary-600" /></div>;
+  if (error) return <div className="text-center py-12"><p className="text-danger-600">{error}</p></div>;
   if (!stats) return null;
 
   const maxBarangay = Math.max(...stats.byBarangay.map(b => b.count), 1);
@@ -97,7 +113,7 @@ export default function AnalyticsPage() {
                   <span className="font-medium">{val}</span>
                 </div>
                 <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${(val / stats.totalReports) * 100}%` }} />
+                  <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${stats.totalReports > 0 ? (val / stats.totalReports) * 100 : 0}%` }} />
                 </div>
               </div>
             ))}
@@ -114,7 +130,7 @@ export default function AnalyticsPage() {
                   <span className="font-medium">{val}</span>
                 </div>
                 <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-accent-500 rounded-full transition-all" style={{ width: `${(val / stats.totalReports) * 100}%` }} />
+                  <div className="h-full bg-accent-500 rounded-full transition-all" style={{ width: `${stats.totalReports > 0 ? (val / stats.totalReports) * 100 : 0}%` }} />
                 </div>
               </div>
             ))}

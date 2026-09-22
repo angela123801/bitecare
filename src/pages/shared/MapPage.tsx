@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { supabase } from '@/lib/supabase';
 import { BACOLOD_CENTER, DEFAULT_ZOOM, FACILITY_TYPE_LABELS } from '@/config/constants';
-import { formatDate } from '@/lib/utils';
+import { formatDate, getErrorMessage } from '@/lib/utils';
 import type { HealthcareFacility, BiteReport } from '@/types';
 import { Loader2, LocateFixed, Layers, X } from 'lucide-react';
 
@@ -103,7 +103,7 @@ export default function MapPage() {
       setFacilities((facRes.data as HealthcareFacility[]) || []);
       setReports((repRes.data as BiteReport[]) || []);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load map data');
+      setError(getErrorMessage(err, 'Failed to load map data'));
     } finally {
       setLoading(false);
     }
@@ -144,7 +144,7 @@ export default function MapPage() {
         <LocateButton />
 
         {showFacilities &&
-          facilities.map((f) => (
+          facilities.filter((f) => f.latitude != null && f.longitude != null).map((f) => (
             <Marker key={f.id} position={[f.latitude, f.longitude]} icon={getFacilityIcon(f.type)}>
               <Popup>
                 <div className="min-w-[200px]">
@@ -160,7 +160,7 @@ export default function MapPage() {
 
         {showReports &&
           reports.map((r) =>
-            r.incident_latitude && r.incident_longitude ? (
+            r.incident_latitude != null && r.incident_longitude != null ? (
               <Marker key={r.id} position={[r.incident_latitude, r.incident_longitude]} icon={getBiteIcon()}>
                 <Popup>
                   <div className="min-w-[180px]">

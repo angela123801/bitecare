@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { BiteReport, BiteReportStatusHistory, VaccinationRecord, ReportStatus, Barangay, Profile } from '@/types';
 import { REPORT_STATUS_COLORS, REPORT_STATUS_LABELS, SEVERITY_COLORS, SEVERITY_LABELS, ANIMAL_TYPE_LABELS, CATEGORY_LABELS, VACCINATION_STATUS_COLORS, VACCINATION_STATUS_LABELS } from '@/config/constants';
-import { formatDate, formatDateTime, cn } from '@/lib/utils';
+import { formatDate, formatDateTime, cn, getErrorMessage } from '@/lib/utils';
 import { ArrowLeft, Loader2, AlertCircle, Clock, Syringe, User, PawPrint, MapPin, ShieldCheck, Send, CheckCircle2, UserPlus } from 'lucide-react';
 
 const ALL_STATUSES: ReportStatus[] = ['reported','under_investigation','treatment_started','treatment_ongoing','treatment_completed','closed','cancelled'];
@@ -43,7 +43,7 @@ export default function ReportDetailPage() {
   const [statusError, setStatusError] = useState('');
 
   const [workers, setWorkers] = useState<Pick<Profile, 'id' | 'full_name'>[]>([]);
-  const [assignWorker, setAssignWorker] = useState('');
+  const [assignWorker, setAssignWorker] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
 
   const [markingDose, setMarkingDose] = useState<string | null>(null);
@@ -62,9 +62,12 @@ export default function ReportDetailPage() {
         supabase.from('bite_report_status_history').select(historySelect).eq('report_id', id).order('created_at', { ascending: true }),
         supabase.from('vaccination_records').select('*, facility:healthcare_facilities(*)').eq('report_id', id).order('dose_number', { ascending: true }),
       ]);
-      if (rpt.error) setError(rpt.error.message);
+      if (rpt.error) setError(getErrorMessage(rpt.error, 'Unable to load this report.'));
       else if (!rpt.data) setError('Report not found');
       else setReport(rpt.data as BiteReport);
+      if (hist.error || vac.error) {
+        setStatusError(getErrorMessage(hist.error || vac.error, 'Some report details could not be loaded.'));
+      }
       setHistory((hist.data as BiteReportStatusHistory[]) ?? []);
       setVaccinations((vac.data as VaccinationRecord[]) ?? []);
       setLoading(false);
@@ -73,7 +76,8 @@ export default function ReportDetailPage() {
 
   useEffect(() => {
     if (!isStaff) return;
-    supabase.from('profiles').select('id, full_name').in('role', ['health_worker', 'admin', 'super_admin']).eq('is_active', true).order('full_name').then(({ data }) => {
+    supabase.from('profiles').select('id, full_name').in('role', ['health_worker', 'admin', 'super_admin']).eq('is_active', true).order('full_name').then(({ data, error: e }) => {
+      if (e) { setStatusError(getErrorMessage(e, 'Failed to load health workers.')); return; }
       if (data) setWorkers(data);
     });
   }, [isStaff]);
@@ -94,27 +98,29 @@ export default function ReportDetailPage() {
     if (!id || !newStatus || !profile) return;
     setUpdatingStatus(true); setStatusSuccess(false); setStatusError('');
     const { error: e } = await supabase.rpc('update_report_status', { p_report_id: id, p_new_status: newStatus, p_notes: statusNote.trim() });
-    if (e) { setStatusError(e.message); }
+    if (e) { setStatusError(getErrorMessage(e, 'Failed to update status')); }
     else { setStatusSuccess(true); setNewStatus(''); setStatusNote(''); await refreshReport(); }
     setUpdatingStatus(false);
   };
 
   const handleAssign = async () => {
-    if (!id || !assignWorker) return;
-    setAssigning(true);
+    if (!id || !assignWorker || assignWorker === '') return;
+    setAssigning(true); setStatusError('');
     const { error: e } = await supabase.from('bite_reports').update({ assigned_worker_id: assignWorker }).eq('id', id);
-    if (!e) { await refreshReport(); setAssignWorker(''); }
+    if (e) { setStatusError(getErrorMessage(e, 'Failed to assign worker')); }
+    else { await refreshReport(); setAssignWorker(null); }
     setAssigning(false);
   };
 
   const handleMarkDose = async (vaccId: string) => {
-    setMarkingDose(vaccId);
+    setMarkingDose(vaccId); setStatusError('');
     const { error: e } = await supabase.from('vaccination_records').update({
       status: 'completed',
       administered_date: new Date().toISOString().split('T')[0],
       administered_by: profile?.id,
     }).eq('id', vaccId);
-    if (!e) await refreshReport();
+    if (e) { setStatusError(getErrorMessage(e, 'Failed to mark dose as done')); }
+    else await refreshReport();
     setMarkingDose(null);
   };
 
@@ -271,13 +277,13 @@ export default function ReportDetailPage() {
                     )}
                   </div>
                 ) : null}
-                {(!report.assigned_worker || assignWorker !== undefined) && isStaff && (
+                {(!report.assigned_worker || assignWorker !== null) && isStaff && (
                   <div className="flex gap-2 mt-2">
-                    <select className="input-field flex-1" value={assignWorker} onChange={(e) => setAssignWorker(e.target.value)}>
+                    <select className="input-field flex-1" value={assignWorker ?? ''} onChange={(e) => setAssignWorker(e.target.value)}>
                       <option value="">Select health worker</option>
                       {workers.map((w) => <option key={w.id} value={w.id}>{w.full_name}</option>)}
                     </select>
-                    <button className="btn-accent flex items-center gap-1" onClick={handleAssign} disabled={!assignWorker || assigning}>
+                    <button className="btn-accent flex items-center gap-1" onClick={handleAssign} disabled={!assignWorker || assigning || assignWorker === ''}>
                       {assigning ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />} Assign
                     </button>
                   </div>

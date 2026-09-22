@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { uploadAvatar } from '@/lib/storage';
-import { formatDate, getInitials, cn } from '@/lib/utils';
+import { uploadAvatar, getSignedUrl } from '@/lib/storage';
+import { formatDate, getInitials, cn, getErrorMessage } from '@/lib/utils';
 import { ROLE_LABELS } from '@/config/constants';
 import {
   Camera,
@@ -26,6 +26,7 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [form, setForm] = useState({
     full_name: '',
     phone: '',
@@ -33,6 +34,18 @@ export default function ProfilePage() {
     city: '',
     date_of_birth: '',
   });
+
+  useEffect(() => {
+    let active = true;
+    if (profile?.avatar_url) {
+      getSignedUrl('avatars', profile.avatar_url)
+        .then((url) => { if (active) setAvatarUrl(url); })
+        .catch((err) => { if (active) { setAvatarUrl(''); console.error('Avatar load failed:', getErrorMessage(err)); } });
+    } else {
+      setAvatarUrl('');
+    }
+    return () => { active = false; };
+  }, [profile?.avatar_url]);
 
   if (authLoading) {
     return (
@@ -78,12 +91,12 @@ export default function ProfilePage() {
     setSaving(true);
     setError('');
     try {
-      await updateProfile(form);
+      await updateProfile({ ...form, date_of_birth: form.date_of_birth || null });
       setEditing(false);
       setSuccess('Profile updated successfully');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to update profile');
+      setError(getErrorMessage(err, 'Failed to update profile'));
     } finally {
       setSaving(false);
     }
@@ -100,7 +113,7 @@ export default function ProfilePage() {
       setSuccess('Avatar updated');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to upload avatar');
+      setError(getErrorMessage(err, 'Failed to upload avatar'));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -129,9 +142,9 @@ export default function ProfilePage() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex flex-col sm:flex-row items-center gap-6">
           <div className="relative group">
-            {profile.avatar_url ? (
+            {avatarUrl ? (
               <img
-                src={profile.avatar_url}
+                src={avatarUrl}
                 alt={profile.full_name}
                 className="w-24 h-24 rounded-full object-cover ring-4 ring-primary-100"
               />

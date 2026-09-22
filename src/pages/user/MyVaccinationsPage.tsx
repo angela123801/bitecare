@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { formatDate, cn } from '@/lib/utils';
+import { formatDate, cn, getErrorMessage } from '@/lib/utils';
 import type { VaccinationRecord, BiteReport } from '@/types';
 import {
   VACCINATION_STATUS_LABELS,
@@ -49,7 +49,7 @@ export default function MyVaccinationsPage() {
       if (vacErr) throw vacErr;
       setRecords((vaccinations as RecordWithReport[]) || []);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load vaccination records');
+      setError(getErrorMessage(err, 'Failed to load vaccination records'));
     } finally {
       setLoading(false);
     }

@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLE_LABELS } from '@/config/constants';
-import { formatDate } from '@/lib/utils';
+import { formatDate, getErrorMessage } from '@/lib/utils';
 import type { Profile, UserRole } from '@/types';
-import { Users, Search, Loader2, Shield, ShieldAlert, ShieldCheck, UserCog, Inbox, Check, X } from 'lucide-react';
+import { Search, Loader2, ShieldAlert, ShieldCheck, UserCog, Inbox, Check, X } from 'lucide-react';
 
 const ROLE_COLORS: Record<UserRole, string> = {
   user: 'bg-gray-100 text-gray-700',
@@ -39,7 +39,8 @@ export default function UserManagementPage() {
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false });
-    if (!error) setUsers(data as Profile[]);
+    if (error) { setError(getErrorMessage(error, 'Unable to load users.')); setUsers([]); }
+    else setUsers(data as Profile[]);
     setLoading(false);
   }
 
@@ -113,7 +114,7 @@ export default function UserManagementPage() {
         </div>
       )}
 
-      {error && <div className="p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm">{error}</div>}
+      {error && <div className="p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm flex items-center justify-between gap-3"><span>{error}</span><button onClick={() => setError('')} className="text-danger-500 hover:text-danger-700"><X className="w-4 h-4" /></button></div>}
       {success && <div className="p-3 rounded-lg bg-success-50 border border-success-200 text-success-700 text-sm">{success}</div>}
 
       <div className="flex flex-col sm:flex-row gap-3">

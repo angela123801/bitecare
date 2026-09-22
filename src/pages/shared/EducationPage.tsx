@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { formatDate, cn } from '@/lib/utils';
+import { formatDate, cn, getErrorMessage } from '@/lib/utils';
 import type { EducationContent } from '@/types';
 import { BookOpen, ArrowLeft, Loader2, Search } from 'lucide-react';
 
@@ -25,7 +25,7 @@ export default function EducationPage() {
       if (fetchErr) throw fetchErr;
       setArticles((data as EducationContent[]) || []);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load articles');
+      setError(getErrorMessage(err, 'Failed to load articles'));
     } finally {
       setLoading(false);
     }
@@ -42,7 +42,7 @@ export default function EducationPage() {
     const matchSearch =
       !searchQuery ||
       a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.summary.toLowerCase().includes(searchQuery.toLowerCase());
+      (a.summary || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchCat && matchSearch;
   });
 

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { formatDateTime } from '@/lib/utils';
+import { formatDateTime, getErrorMessage } from '@/lib/utils';
 import type { AuditLog } from '@/types';
-import { ScrollText, Loader2, Search, Inbox, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Inbox, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const PAGE_SIZE = 25;
 
@@ -11,13 +11,15 @@ export default function AuditLogPage() {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
-  const [search, setSearch] = useState('');
+  const [error, setError] = useState('');
+
   const [entityFilter, setEntityFilter] = useState('all');
 
-  useEffect(() => { fetch(); }, [page, entityFilter]);
+  useEffect(() => { loadLogs(); }, [page, entityFilter]);
 
-  async function fetch() {
+  async function loadLogs() {
     setLoading(true);
+    setError('');
     let query = supabase
       .from('audit_logs')
       .select('*, actor:profiles!audit_logs_actor_id_fkey(full_name, email)', { count: 'exact' })
@@ -26,9 +28,9 @@ export default function AuditLogPage() {
 
     if (entityFilter !== 'all') query = query.eq('entity_type', entityFilter);
 
-    const { data, count } = await query;
-    setLogs((data as unknown as AuditLog[]) ?? []);
-    setTotal(count ?? 0);
+    const { data, count, error: err } = await query;
+    if (err) { setError(getErrorMessage(err, 'Unable to load audit logs.')); setLogs([]); setTotal(0); }
+    else { setLogs((data as unknown as AuditLog[]) ?? []); setTotal(count ?? 0); }
     setLoading(false);
   }
 
@@ -55,9 +57,13 @@ export default function AuditLogPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         <select value={entityFilter} onChange={e => { setEntityFilter(e.target.value); setPage(0); }} className="input-field w-auto">
           <option value="all">All Types</option>
-          {entityTypes.map(t => <option key={t} value={t}>{t.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>)}
+          {entityTypes.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</option>)}
         </select>
       </div>
+
+      {error && (
+        <div className="p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm">{error}</div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary-600" /></div>
@@ -83,10 +89,10 @@ export default function AuditLogPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ACTION_COLORS[l.action] ?? 'bg-gray-100 text-gray-700'}`}>
-                        {l.action.replace('_', ' ')}
+                        {l.action.replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{l.entity_type.replace('_', ' ')}</td>
+                    <td className="px-4 py-3 text-gray-600">{l.entity_type.replace(/_/g, ' ')}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate">
                       {l.new_values ? JSON.stringify(l.new_values) : '-'}
                     </td>

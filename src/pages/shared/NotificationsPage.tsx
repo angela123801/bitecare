@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { formatRelativeTime, cn } from '@/lib/utils';
+import { formatRelativeTime, cn, getErrorMessage } from '@/lib/utils';
 import type { Notification, NotificationType } from '@/types';
 import {
   Info,
@@ -10,7 +11,6 @@ import {
   XCircle,
   Clock,
   UserCheck,
-  Bell,
   BellOff,
   Loader2,
   CheckCheck,
@@ -38,6 +38,7 @@ type Filter = 'all' | 'unread';
 
 export default function NotificationsPage() {
   const { user } = useAuth();
+  const { refreshNotifications } = useOutletContext<{ refreshNotifications: () => Promise<number | undefined> }>();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -57,7 +58,7 @@ export default function NotificationsPage() {
       if (fetchErr) throw fetchErr;
       setNotifications((data as Notification[]) || []);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load notifications');
+      setError(getErrorMessage(err, 'Failed to load notifications'));
     } finally {
       setLoading(false);
     }
@@ -73,11 +74,14 @@ export default function NotificationsPage() {
       .update({ is_read: true, read_at: new Date().toISOString() })
       .eq('id', id);
 
-    if (!updateErr) {
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n))
-      );
+    if (updateErr) {
+      setError(getErrorMessage(updateErr, 'Failed to mark notification as read'));
+      return;
     }
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n))
+    );
+    refreshNotifications?.();
   };
 
   const markAllAsRead = async () => {
@@ -91,11 +95,14 @@ export default function NotificationsPage() {
       .eq('user_id', user.id)
       .eq('is_read', false);
 
-    if (!updateErr) {
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, is_read: true, read_at: n.read_at || new Date().toISOString() }))
-      );
+    if (updateErr) {
+      setError(getErrorMessage(updateErr, 'Failed to mark notifications as read'));
+      return;
     }
+    setNotifications((prev) =>
+      prev.map((n) => ({ ...n, is_read: true, read_at: n.read_at || new Date().toISOString() }))
+    );
+    refreshNotifications?.();
   };
 
   const filtered = filter === 'unread' ? notifications.filter((n) => !n.is_read) : notifications;
