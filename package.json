@@ -8,7 +8,13 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "supabase:reset": "supabase db reset",
+    "supabase:dump": "supabase db dump -f supabase/backup.sql",
+    "supabase:restore": "psql $SUPABASE_DB_URL -f supabase/backup.sql"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
