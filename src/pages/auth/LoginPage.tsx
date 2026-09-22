@@ -87,11 +87,13 @@ export default function LoginPage() {
             alt="BiteCare Logo"
             className="w-20 h-20 mx-auto mb-3 drop-shadow-lg"
           />
-          <h1 className="text-3xl font-bold text-white drop-shadow-md">BiteCare</h1>
-          <p className="text-white/80 text-sm mt-1 drop-shadow">
-            Animal Bite Management & Monitoring System
+          <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-white drop-shadow-md tracking-tight">
+            BiteCare
+          </h1>
+          <p className="font-display text-white/85 text-sm sm:text-base font-semibold mt-2 drop-shadow leading-snug max-w-xs mx-auto">
+            A Mobile &amp; Web Application Animal Bite Management for Monitoring System &amp; Decision Support System
           </p>
-          <p className="text-white/60 text-xs mt-0.5">Bacolod City, Negros Occidental</p>
+          <p className="text-white/60 text-xs font-medium mt-1.5">Bacolod City, Negros Occidental</p>
         </div>
 
         {/* Login card */}

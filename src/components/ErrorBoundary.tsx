@@ -37,7 +37,7 @@ export class ErrorBoundary extends Component<Props, State> {
           {isMissingEnv ? (
             <div className="space-y-3">
               <p className="text-sm text-gray-600">
-                BiteCare cannot connect to Supabase because the required settings are missing.
+                <span className="font-display font-bold">BiteCare</span> cannot connect to Supabase because the required settings are missing.
               </p>
               <div className="bg-gray-50 rounded-lg p-4 text-xs font-mono text-gray-700 space-y-1">
                 <p className="text-gray-500 mb-2"># Copy .env.example to .env and fill in your values:</p>

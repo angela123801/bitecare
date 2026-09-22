@@ -100,8 +100,13 @@ export default function RegisterPage() {
         {/* Logo & branding */}
         <div className="text-center mb-5">
           <img src="/logo.png" alt="BiteCare Logo" className="w-16 h-16 mx-auto mb-2 drop-shadow-lg" />
-          <h1 className="text-2xl font-bold text-white drop-shadow-md">BiteCare</h1>
-          <p className="text-white/70 text-sm mt-0.5">Create your account</p>
+          <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white drop-shadow-md tracking-tight">
+            BiteCare
+          </h1>
+          <p className="font-display text-white/85 text-xs sm:text-sm font-semibold mt-1.5 drop-shadow leading-snug max-w-xs mx-auto">
+            A Mobile &amp; Web Application Animal Bite Management for Monitoring System &amp; Decision Support System
+          </p>
+          <p className="text-white/60 text-xs font-medium mt-1">Create your account</p>
         </div>
 
         <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-7">

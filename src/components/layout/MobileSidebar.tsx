@@ -26,7 +26,7 @@ export default function MobileSidebar({ open, onClose }: MobileSidebarProps) {
             <div className="w-9 h-9 rounded-lg bg-primary-600 flex items-center justify-center">
               <PawPrint className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-bold text-gray-900">BiteCare</span>
+            <span className="font-display text-lg font-bold text-gray-900">BiteCare</span>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg text-gray-400 hover:text-gray-600">
             <X className="w-5 h-5" />

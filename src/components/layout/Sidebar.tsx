@@ -123,7 +123,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
           <PawPrint className="w-5 h-5 text-white" />
         </div>
         {!collapsed && (
-          <span className="text-lg font-bold text-gray-900 whitespace-nowrap">BiteCare</span>
+          <span className="font-display text-lg font-bold text-gray-900 whitespace-nowrap">BiteCare</span>
         )}
       </div>
 
