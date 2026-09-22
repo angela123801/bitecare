@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+
+  * {
+    @apply border-gray-200;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800
+      px-4 py-2 rounded-lg font-medium text-sm transition-colors duration-150
+      focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 active:bg-gray-100
+      px-4 py-2 rounded-lg font-medium text-sm transition-colors duration-150
+      focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-danger {
+    @apply bg-danger-600 text-white hover:bg-danger-700 active:bg-danger-800
+      px-4 py-2 rounded-lg font-medium text-sm transition-colors duration-150
+      focus:outline-none focus:ring-2 focus:ring-danger-500 focus:ring-offset-2
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-accent {
+    @apply bg-accent-600 text-white hover:bg-accent-700 active:bg-accent-800
+      px-4 py-2 rounded-lg font-medium text-sm transition-colors duration-150
+      focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
+      placeholder:text-gray-400
+      focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+      disabled:bg-gray-100 disabled:cursor-not-allowed
+      transition-colors duration-150;
+  }
+
+  .card {
+    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+  }
+
+  .card-hover {
+    @apply card hover:shadow-md hover:border-gray-300 transition-all duration-200;
+  }
+}
+
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
