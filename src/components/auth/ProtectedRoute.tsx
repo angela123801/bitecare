@@ -9,10 +9,10 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, minRole }: ProtectedRouteProps) {
-  const { user, profile, loading, isRoleAtLeast } = useAuth();
+  const { user, profile, loading, profileLoading, isRoleAtLeast } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  if (loading || (user && !profile && profileLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-3">

@@ -8,6 +8,7 @@ interface AuthState {
   profile: Profile | null;
   session: Session | null;
   loading: boolean;
+  profileLoading: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
@@ -48,6 +50,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data as Profile | null;
   }, []);
 
+  // Loads the profile for a user and tracks that it is in flight, so route
+  // guards can tell "still loading" apart from "signed out".
+  const loadProfile = useCallback(async (userId: string) => {
+    setProfileLoading(true);
+    try {
+      const p = await fetchProfile(userId);
+      setProfile(p);
+      return p;
+    } finally {
+      setProfileLoading(false);
+    }
+  }, [fetchProfile]);
+
   const refreshProfile = useCallback(async () => {
     if (!user) return;
     const p = await fetchProfile(user.id);
@@ -62,8 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        fetchProfile(s.user.id).then((p) => {
-          if (mounted) { setProfile(p); setLoading(false); }
+        loadProfile(s.user.id).finally(() => {
+          if (mounted) setLoading(false);
         });
       } else {
         setLoading(false);
@@ -77,8 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        fetchProfile(s.user.id).then((p) => {
-          if (mounted) { setProfile(p); setLoading(false); }
+        loadProfile(s.user.id).finally(() => {
+          if (mounted) setLoading(false);
         });
       } else {
         setProfile(null);
@@ -87,20 +102,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => { mounted = false; subscription.unsubscribe(); };
-  }, [fetchProfile]);
+  }, [loadProfile]);
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName } },
     });
     if (error) throw error;
+    // Ensure the profile (created by the DB trigger) is loaded before the
+    // caller navigates, so route guards don't bounce the new user to /login.
+    if (data.user?.id) {
+      await loadProfile(data.user.id);
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    // Load the profile before resolving so navigation to the dashboard
+    // finds an authenticated user with a profile already in place.
+    if (data.user?.id) {
+      await loadProfile(data.user.id);
+    }
   };
 
   const signOut = async () => {
@@ -109,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setSession(null);
+    setProfileLoading(false);
   };
 
   const resetPassword = async (email: string) => {
@@ -146,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         session,
         loading,
+        profileLoading,
         signUp,
         signIn,
         signOut,
