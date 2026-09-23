@@ -1,0 +1,95 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      ".read": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      "$uid": {
+        ".read": "auth !== null && auth.uid === $uid",
+        ".write": "auth !== null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+        ".validate": "newData.hasChildren(['uid', 'email', 'role'])",
+        "uid": {
+          ".validate": "newData.val() === $uid"
+        },
+        "email": {
+          ".validate": "newData.isString() && newData.val().length <= 254"
+        },
+        "role": {
+          ".validate": "newData.isString() && (data.val() === null || newData.val() === data.val() || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+        },
+        "status": {
+          ".validate": "newData.isString() && (data.val() === null || newData.val() === data.val() || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+        },
+        "$other": {
+          ".validate": true
+        }
+      }
+    },
+
+    "reports": {
+      ".read": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      "$id": {
+        ".read": "auth !== null && data.child('user_id').val() === auth.uid",
+        ".write": "auth !== null && ((!data.exists() && newData.child('user_id').val() === auth.uid) || root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+        ".validate": "newData.hasChildren(['user_id', 'full_name', 'bite_date', 'status', 'timestamp'])",
+        "user_id": {
+          ".validate": "newData.isString()"
+        },
+        "status": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        }
+      }
+    },
+
+    "appointments": {
+      ".read": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      "$id": {
+        ".read": "auth !== null && (data.child('user_id').val() === auth.uid || data.child('patient_uid').val() === auth.uid)",
+        ".write": "auth !== null && ((!data.exists() && (newData.child('user_id').val() === auth.uid || newData.child('patient_uid').val() === auth.uid)) || root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+      }
+    },
+
+    "vaccinations": {
+      ".read": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      "$id": {
+        ".read": "auth !== null && (data.child('user_id').val() === auth.uid || data.child('patient_uid').val() === auth.uid)",
+        ".write": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+      }
+    },
+
+    "notifications": {
+      ".read": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      "$id": {
+        ".read": "auth !== null && (data.child('user_id').val() === auth.uid || data.child('uid').val() === auth.uid || data.child('recipient_id').val() === auth.uid)",
+        ".write": "auth !== null && ((root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin') || data.child('user_id').val() === auth.uid || data.child('uid').val() === auth.uid || data.child('recipient_id').val() === auth.uid)"
+      }
+    },
+
+    "centers": {
+      ".read": "auth !== null",
+      ".write": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      "$id": {
+        ".validate": "newData.hasChildren(['center_name', 'type', 'latitude', 'longitude'])"
+      }
+    },
+
+    "audit_logs": {
+      ".read": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      "$id": {
+        ".write": "auth !== null && !data.exists()",
+        ".validate": "newData.hasChildren(['timestamp'])"
+      }
+    },
+
+    "health_workers": {
+      ".read": "auth !== null && root.child('users').child(auth.uid).child('role').val() === 'super_admin'",
+      ".write": "auth !== null && root.child('users').child(auth.uid).child('role').val() === 'super_admin'"
+    },
+
+    "Super_Admin": {
+      ".read": "auth !== null && root.child('users').child(auth.uid).child('role').val() === 'super_admin'",
+      ".write": "auth !== null && root.child('users').child(auth.uid).child('role').val() === 'super_admin'"
+    }
+  }
+}
