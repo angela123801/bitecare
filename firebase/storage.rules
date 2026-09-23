@@ -1,0 +1,50 @@
+rules_version = '2';
+
+// BiteCare Storage rules.
+// NOTE: role lookups for cross-user staff access cannot be done in Storage rules
+// without custom claims, so staff-wide reads are granted via Firebase Auth custom
+// claims (role=health_worker/admin/superadmin) set server-side. Until claims are
+// issued, only owners can read their own uploads.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        (request.auth.token.role == 'admin' || request.auth.token.role == 'superadmin');
+    }
+
+    function isStaff() {
+      return isSignedIn() &&
+        (request.auth.token.role == 'health_worker' || isAdmin());
+    }
+
+    function isValidImage() {
+      return request.resource.size <= 2 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/(jpeg|png|webp|gif)');
+    }
+
+    // Profile photos: owner controls their own folder; admins may read all.
+    match /profile-photos/{uid}/{fileName} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isSignedIn() && request.auth.uid == uid && isValidImage();
+      allow delete: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+    }
+
+    // Incident photos: owner uploads; staff may read for case handling.
+    match /incident-photos/{reportId}/{fileName} {
+      allow read: if isSignedIn() && isStaff();
+      allow write: if isSignedIn() && isValidImage();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // Everything else is denied by default.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

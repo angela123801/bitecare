@@ -4,22 +4,18 @@
     ".write": false,
 
     "users": {
-      ".read": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
       "$uid": {
-        ".read": "auth !== null && auth.uid === $uid",
-        ".write": "auth !== null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
-        ".validate": "newData.hasChildren(['uid', 'email', 'role'])",
-        "uid": {
-          ".validate": "newData.val() === $uid"
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+        "role": {
+          ".validate": "newData.isString() && (data.val() === null || newData.val() === data.val() || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+        },
+        "status": {
+          ".validate": "newData.isString() && (data.val() === null || newData.val() === data.val() || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
         },
         "email": {
           ".validate": "newData.isString() && newData.val().length <= 254"
-        },
-        "role": {
-          ".validate": "newData.isString() && (data.val() === null || newData.val() === data.val() || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
-        },
-        "status": {
-          ".validate": "newData.isString() && (data.val() === null || newData.val() === data.val() || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
         },
         "$other": {
           ".validate": true
@@ -27,15 +23,19 @@
       }
     },
 
+    "pending_users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
     "reports": {
-      ".read": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
       "$id": {
-        ".read": "auth !== null && data.child('user_id').val() === auth.uid",
-        ".write": "auth !== null && ((!data.exists() && newData.child('user_id').val() === auth.uid) || root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
-        ".validate": "newData.hasChildren(['user_id', 'full_name', 'bite_date', 'status', 'timestamp'])",
-        "user_id": {
-          ".validate": "newData.isString()"
-        },
+        ".read": "auth != null && data.child('user_id').val() === auth.uid",
+        ".write": "auth != null && ((!data.exists() && newData.child('user_id').val() === auth.uid) || data.child('user_id').val() === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+        ".validate": "newData.hasChildren(['user_id', 'full_name', 'status'])",
         "status": {
           ".validate": "newData.isString() && newData.val().length <= 40"
         }
@@ -43,53 +43,105 @@
     },
 
     "appointments": {
-      ".read": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
       "$id": {
-        ".read": "auth !== null && (data.child('user_id').val() === auth.uid || data.child('patient_uid').val() === auth.uid)",
-        ".write": "auth !== null && ((!data.exists() && (newData.child('user_id').val() === auth.uid || newData.child('patient_uid').val() === auth.uid)) || root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+        ".read": "auth != null && (data.child('user_id').val() === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+        ".write": "auth != null && ((!data.exists() && newData.child('user_id').val() === auth.uid) || data.child('user_id').val() === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
       }
     },
 
     "vaccinations": {
-      ".read": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
-      "$id": {
-        ".read": "auth !== null && (data.child('user_id').val() === auth.uid || data.child('patient_uid').val() === auth.uid)",
-        ".write": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+      }
+    },
+
+    "report_vaccinations": {
+      "$reportId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+      }
+    },
+
+    "vaccination_reminders_sent": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
       }
     },
 
     "notifications": {
-      ".read": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
-      "$id": {
-        ".read": "auth !== null && (data.child('user_id').val() === auth.uid || data.child('uid').val() === auth.uid || data.child('recipient_id').val() === auth.uid)",
-        ".write": "auth !== null && ((root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin') || data.child('user_id').val() === auth.uid || data.child('uid').val() === auth.uid || data.child('recipient_id').val() === auth.uid)"
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+      }
+    },
+
+    "hw_notifications": {
+      "$hwId": {
+        ".read": "auth != null && (auth.uid === $hwId || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
       }
     },
 
     "centers": {
-      ".read": "auth !== null",
-      ".write": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+    },
+
+    "education_resources": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+    },
+
+    "announcements": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+    },
+
+    "incident_photos": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'health_worker' || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
       "$id": {
-        ".validate": "newData.hasChildren(['center_name', 'type', 'latitude', 'longitude'])"
+        ".read": "auth != null && data.child('uploadedBy').val() === auth.uid",
+        ".write": "auth != null && ((!data.exists() && newData.child('uploadedBy').val() === auth.uid) || data.child('uploadedBy').val() === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
       }
     },
 
+    "system_settings": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin' || root.child('users').child(auth.uid).child('role').val() === 'admin')"
+    },
+
     "audit_logs": {
-      ".read": "auth !== null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
       "$id": {
-        ".write": "auth !== null && !data.exists()",
+        ".write": "auth != null && !data.exists()",
         ".validate": "newData.hasChildren(['timestamp'])"
       }
     },
 
+    "staff_logs": {
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      "$id": {
+        ".write": "auth != null && !data.exists()"
+      }
+    },
+
+    "dtr_records": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
+      }
+    },
+
     "health_workers": {
-      ".read": "auth !== null && root.child('users').child(auth.uid).child('role').val() === 'super_admin'",
-      ".write": "auth !== null && root.child('users').child(auth.uid).child('role').val() === 'super_admin'"
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
     },
 
     "Super_Admin": {
-      ".read": "auth !== null && root.child('users').child(auth.uid).child('role').val() === 'super_admin'",
-      ".write": "auth !== null && root.child('users').child(auth.uid).child('role').val() === 'super_admin'"
+      ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'superadmin' || root.child('users').child(auth.uid).child('role').val() === 'super_admin')"
     }
   }
 }
