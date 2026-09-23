@@ -3,8 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLE_LABELS } from '@/config/constants';
 import { LOGIN_ROLES, ROLE_MISMATCH_MESSAGE } from '@/lib/navigation';
+import { useInstallApp } from '@/lib/installPrompt';
 import type { UserRole } from '@/types';
-import { Eye, EyeOff, Loader2, X, Mail, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Loader2, X, Mail, CheckCircle, AlertCircle, ShieldCheck, Download, Smartphone } from 'lucide-react';
 
 export default function LoginPage() {
   const { signIn, signOut, resetPassword } = useAuth();
@@ -21,7 +22,17 @@ export default function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [resetError, setResetError] = useState('');
+  const [showIosHelp, setShowIosHelp] = useState(false);
   const resetInputRef = useRef<HTMLInputElement>(null);
+  const { canInstall, install, installing, platform } = useInstallApp();
+
+  const handleInstall = async () => {
+    if (platform === 'ios') {
+      setShowIosHelp(true);
+      return;
+    }
+    await install();
+  };
 
   useEffect(() => {
     if (showForgotModal && resetInputRef.current) {
@@ -217,6 +228,26 @@ export default function LoginPage() {
             Create account
           </Link>
         </p>
+
+        {canInstall && (
+          <div className="mt-4 flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={handleInstall}
+              disabled={installing}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-medium border border-white/25 transition-colors disabled:opacity-60"
+            >
+              {installing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              Install app on this device
+            </button>
+            {showIosHelp && (
+              <p className="flex items-start gap-2 max-w-xs text-xs text-white/85 text-left bg-black/35 backdrop-blur-sm rounded-lg p-3">
+                <Smartphone className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>Tap the Share button in Safari, then choose Add to Home Screen.</span>
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Forgot Password Modal */}

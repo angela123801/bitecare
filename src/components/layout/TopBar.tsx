@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn, getInitials, getErrorMessage } from '@/lib/utils';
 import { getSignedUrl } from '@/lib/storage';
+import { useInstallApp } from '@/lib/installPrompt';
 import { ROLE_LABELS } from '@/config/constants';
 import {
   Bell,
@@ -10,6 +11,10 @@ import {
   LogOut,
   User,
   ChevronDown,
+  Download,
+  Loader2,
+  Smartphone,
+  X,
 } from 'lucide-react';
 import type { UserRole } from '@/types';
 
@@ -23,7 +28,9 @@ export default function TopBar({ onMenuClick, unreadCount }: TopBarProps) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { canInstall, install, installing, platform } = useInstallApp();
 
   useEffect(() => {
     let active = true;
@@ -46,6 +53,15 @@ export default function TopBar({ onMenuClick, unreadCount }: TopBarProps) {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  const handleInstall = async () => {
+    // iPhone and iPad expose no install prompt, so show the manual steps.
+    if (platform === 'ios') {
+      setShowInstallHelp(true);
+      return;
+    }
+    await install();
+  };
 
   const handleSignOut = async () => {
     setMenuOpen(false);
@@ -71,6 +87,42 @@ export default function TopBar({ onMenuClick, unreadCount }: TopBarProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Install the app on this device */}
+        {canInstall && (
+          <div className="relative">
+            <button
+              onClick={handleInstall}
+              disabled={installing}
+              className="flex items-center gap-2 px-2.5 sm:px-3 py-2 rounded-lg text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors disabled:opacity-60"
+            >
+              {installing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              <span className="hidden sm:inline">Install app</span>
+            </button>
+
+            {showInstallHelp && (
+              <div className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl border border-gray-200 shadow-lg p-4 z-50">
+                <button
+                  type="button"
+                  onClick={() => setShowInstallHelp(false)}
+                  className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <div className="flex items-center gap-2 mb-2">
+                  <Smartphone className="w-5 h-5 text-primary-600" />
+                  <p className="font-semibold text-gray-900 text-sm">Add BiteCare to your phone</p>
+                </div>
+                <ol className="text-sm text-gray-600 space-y-1.5 list-decimal list-inside">
+                  <li>Tap the Share button in Safari.</li>
+                  <li>Scroll down and tap Add to Home Screen.</li>
+                  <li>Tap Add. The BiteCare icon appears on your home screen.</li>
+                </ol>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Notifications */}
         <button
           onClick={() => navigate('/notifications')}
