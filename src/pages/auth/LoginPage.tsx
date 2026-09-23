@@ -1,13 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Eye, EyeOff, Loader2, X, Mail, CheckCircle, AlertCircle } from 'lucide-react';
+import { ROLE_LABELS } from '@/config/constants';
+import { LOGIN_ROLES, ROLE_MISMATCH_MESSAGE } from '@/lib/navigation';
+import type { UserRole } from '@/types';
+import { Eye, EyeOff, Loader2, X, Mail, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
 
 export default function LoginPage() {
-  const { signIn, resetPassword } = useAuth();
+  const { signIn, signOut, resetPassword } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<UserRole | ''>('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,9 +32,24 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!role) {
+      setError('Please select your role.');
+      return;
+    }
+
     setLoading(true);
     try {
-      await signIn(email, password);
+      const profile = await signIn(email, password);
+
+      // The selected role is a confirmation step, not the source of authority.
+      // The role stored against the account is what actually decides access.
+      if (!profile || profile.role !== role) {
+        await signOut();
+        setError(ROLE_MISMATCH_MESSAGE);
+        return;
+      }
+
       navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Login failed';
@@ -157,6 +176,28 @@ export default function LoginPage() {
               >
                 Forgot password?
               </button>
+            </div>
+
+            <div>
+              <label htmlFor="loginRole" className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1">
+                <ShieldCheck className="w-4 h-4 text-primary-600" />
+                Select your role
+              </label>
+              <select
+                id="loginRole"
+                value={role}
+                onChange={(e) => setRole(e.target.value as UserRole)}
+                className="input-field"
+                required
+              >
+                <option value="" disabled>Choose the role you sign in as</option>
+                {LOGIN_ROLES.map((r) => (
+                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1.5">
+                Your selected role must match the role on your account. This is verified by the system.
+              </p>
             </div>
 
             <button

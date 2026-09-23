@@ -18,6 +18,7 @@ export const ROLE_OPTIONS: RoleOption[] = [
 export function rolesForCreator(role: UserRole | undefined): UserRole[] {
   if (role === 'super_admin') return ['super_admin', 'admin', 'health_worker', 'user'];
   if (role === 'admin') return ['health_worker', 'user'];
+  if (role === 'health_worker') return ['user'];
   return [];
 }
 

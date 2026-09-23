@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import type { Barangay } from '@/types';
 import { getErrorMessage } from '@/lib/utils';
-import { Eye, EyeOff, Loader2, ChevronDown, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ChevronDown, AlertCircle, Lock } from 'lucide-react';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -48,7 +48,6 @@ export default function RegisterPage() {
         options: {
           data: {
             full_name: form.fullName.trim(),
-            role: 'user',
           },
         },
       });
@@ -119,6 +118,24 @@ export default function RegisterPage() {
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
               <input id="email" type="email" value={form.email} onChange={set('email')} className="input-field" placeholder="you@example.com" required autoComplete="email" />
+            </div>
+
+            <div>
+              <label htmlFor="registerRole" className="block text-sm font-medium text-gray-700 mb-1">Account role</label>
+              <div className="relative">
+                <input
+                  id="registerRole"
+                  type="text"
+                  value="Resident"
+                  readOnly
+                  disabled
+                  className="input-field bg-gray-100 text-gray-600 cursor-not-allowed"
+                />
+                <Lock className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">
+                Public registration creates Resident accounts only. Staff roles are assigned by an administrator.
+              </p>
             </div>
 
             <div>

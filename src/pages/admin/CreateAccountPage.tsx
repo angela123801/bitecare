@@ -102,7 +102,9 @@ export default function CreateAccountPage() {
                 {result!.requires_verification ? ' and is verified.' : ' and is ready to sign in.'}
               </p>
               <div className="flex gap-3 justify-center">
-                <Link to="/admin/users" className="btn-secondary px-5 py-2.5">View users</Link>
+                {profile?.role !== 'health_worker' && (
+                  <Link to="/admin/users" className="btn-secondary px-5 py-2.5">View users</Link>
+                )}
                 <button type="button" onClick={resetForm} className="btn-primary px-5 py-2.5">Create another</button>
               </div>
             </div>

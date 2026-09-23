@@ -54,6 +54,7 @@ function useNavItems(): NavItem[] {
     return [
       ...base,
       { label: 'Cases', path: '/cases', icon: <Stethoscope className="w-5 h-5" /> },
+      { label: 'Create Account', path: '/admin/users/new', icon: <UserPlus className="w-5 h-5" /> },
       { label: 'Vaccinations', path: '/vaccinations', icon: <Syringe className="w-5 h-5" /> },
       { label: 'Appointments', path: '/appointments', icon: <CalendarDays className="w-5 h-5" /> },
       { label: 'Map', path: '/map', icon: <Map className="w-5 h-5" /> },

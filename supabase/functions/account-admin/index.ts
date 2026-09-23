@@ -12,8 +12,6 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const EMAIL_FROM = Deno.env.get('EMAIL_FROM') ?? 'BiteCare <onboarding@resend.dev>';
 
-const ADMIN_ROLES = ['super_admin', 'admin'];
-
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -76,7 +74,7 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     const callerRole = callerProfile?.role ?? 'user';
-    if (!ADMIN_ROLES.includes(callerRole)) {
+    if (!['super_admin', 'admin', 'health_worker'].includes(callerRole)) {
       return json({ error: 'Your role cannot create accounts' }, 403);
     }
 
@@ -130,6 +128,14 @@ Deno.serve(async (req: Request) => {
         })
         .eq('id', newUserId);
       if (updateErr) return json({ error: updateErr.message }, 500);
+
+      // Keep the sign-in token's role claim in step with the profile, so the
+      // new account's first session carries the correct role immediately.
+      const { error: metaErr } = await adminClient.rpc('set_user_app_metadata', {
+        p_user_id: newUserId,
+        p_role: role,
+      });
+      if (metaErr) return json({ error: metaErr.message }, 500);
 
       let code: string | null = null;
       let emailSent = false;

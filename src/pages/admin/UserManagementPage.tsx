@@ -86,6 +86,21 @@ export default function UserManagementPage() {
     setActionLoading(null);
   }
 
+  const assignableRoles: UserRole[] = myProfile?.role === 'super_admin'
+    ? ['user', 'health_worker', 'admin', 'super_admin']
+    : myProfile?.role === 'admin'
+      ? ['user', 'health_worker']
+      : [];
+
+  // A caller may only change accounts their role outranks; the database enforces
+  // the same rule independently.
+  function canManage(u: Profile): boolean {
+    if (!myProfile || u.id === myProfile.id) return false;
+    if (myProfile.role === 'super_admin') return true;
+    if (myProfile.role === 'admin') return u.role === 'user' || u.role === 'health_worker';
+    return false;
+  }
+
   const filtered = users.filter((u) => {
     if (roleFilter !== 'all' && u.role !== roleFilter) return false;
     if (search) {
@@ -100,6 +115,20 @@ export default function UserManagementPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
         <p className="text-sm text-gray-500 mt-1">{users.length} registered users</p>
+      </div>
+
+      <div className="p-4 rounded-xl bg-primary-50 border border-primary-200 text-primary-800">
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">Your account role: {myProfile ? ROLE_LABELS[myProfile.role] : '\u2014'}</p>
+            <p className="text-sm mt-0.5">
+              {myProfile?.role === 'super_admin'
+                ? 'You can create and manage every role, including other super admins and admins.'
+                : 'You can create and manage health worker and resident accounts. Roles cannot be changed on your own account.'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {!hasSuperAdmin && (
@@ -156,7 +185,7 @@ export default function UserManagementPage() {
                       {editingRole === u.id ? (
                         <div className="flex items-center gap-2">
                           <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="input-field py-1 text-xs w-32">
-                            {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                            {assignableRoles.map((k) => <option key={k} value={k}>{ROLE_LABELS[k]}</option>)}
                           </select>
                           <button onClick={() => handleRoleChange(u.id)} disabled={actionLoading === u.id} className="p-1 text-success-600 hover:bg-success-50 rounded">
                             <Check className="w-4 h-4" />
@@ -179,7 +208,7 @@ export default function UserManagementPage() {
                     <td className="px-4 py-3 text-gray-500">{formatDate(u.created_at)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        {u.id !== myProfile?.id && (
+                        {canManage(u) && (
                           <>
                             <button
                               onClick={() => { setEditingRole(u.id); setNewRole(u.role); }}

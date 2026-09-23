@@ -10,7 +10,7 @@ interface AuthState {
   loading: boolean;
   profileLoading: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<Profile | null>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
@@ -118,14 +118,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<Profile | null> => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     // Load the profile before resolving so navigation to the dashboard
-    // finds an authenticated user with a profile already in place.
+    // finds an authenticated user with a profile already in place, and so the
+    // caller can compare the actual role against the one selected at login.
     if (data.user?.id) {
-      await loadProfile(data.user.id);
+      return await loadProfile(data.user.id);
     }
+    return null;
   };
 
   const signOut = async () => {
