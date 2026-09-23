@@ -1,0 +1,27 @@
+{
+
+    "cho_bacolod": {
+      "center_name": "Bacolod City Health Office (CHO)",
+      "address": "A.B. Parreño St., Bacolod City",
+      "contact": "(034) 434 4098",
+      "type": "Hospital",
+      "latitude": 10.6698,
+      "longitude": 122.9515
+    },
+    "clmmrh": {
+      "center_name": "CLMMRH Regional Hospital",
+      "address": "Lacson St., Bacolod City",
+      "contact": "(034) 706 6300",
+      "type": "Hospital",
+      "latitude": 10.6834,
+      "longitude": 122.9567
+    },
+    "abc_center": {
+      "center_name": "ABC Animal Bite Center",
+      "address": "B.S. Aquino Dr, Bacolod City",
+      "contact": "0917-123-4567",
+      "type": "Clinic",
+      "latitude": 10.6805,
+      "longitude": 122.9528
+    }
+  }

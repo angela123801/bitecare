@@ -1,0 +1,27 @@
+{
+    "Admin_001": {
+      "name": "Test Admin A",
+      "access_code": "12345",
+        "role": "superadmin"
+    },
+    "Admin_002": {
+      "name": "Test Admin B",
+      "access_code": "12345",
+        "role": "superadmin"
+    },
+    "Admin_003": {
+      "name": "Rolly Jim Celeste",
+      "access_code": "12345",
+        "role": "superadmin"
+    },
+    "Admin_004": {
+      "name": "Jessa Mae Bucal",
+      "access_code": "12345",
+        "role": "superadmin"
+    },
+    "Admin_005": {
+      "name": "Mark Joseph Ong",
+      "access_code": "superadmin"
+    
+    }
+}

@@ -1,0 +1,27 @@
+{
+    "HW-001": {
+        "name": "Dr. John Doe",
+        "access_code": "212341",
+        "role": "staff"
+    },
+    "HW-002": {
+        "name": "Rolly Jim",
+        "access_code": "384511",
+        "role": "staff"
+    },
+    "HW-003": {
+        "name": "Nurse Joy",
+        "access_code": "123412",
+        "role": "staff"
+    },
+    "HW-004": {
+        "name": "Mark Smith",
+        "access_code": "234514",
+        "role": "staff"
+    },
+    "HW-005": {
+        "name": "markjoseph ong",
+        "access_code": "567890",
+        "role": "staff"
+    }
+}

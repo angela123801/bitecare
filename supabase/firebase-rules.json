@@ -1,0 +1,94 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'health' || root.child('users').child(auth.uid).child('role').val() === 'superadmin')",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "pending_users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "reports": {
+      ".read": "auth != null || true",
+      "$id": {
+        ".write": "auth != null || true"
+      }
+    },
+    "notifications": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": true
+      }
+    },
+    "vaccinations": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || true)",
+        ".write": true
+      }
+    },
+    "education_resources": {
+      ".read": true,
+      ".write": true
+    },
+    "audit_logs": {
+      ".read": true,
+      "$id": {
+        ".write": "!data.exists()"
+      }
+    },
+    "health_workers": {
+      ".read": true,
+      ".write": true
+    },
+    "Super_Admin": {
+      ".read": true,
+      ".write": true
+    },
+    "hw_notifications": {
+      ".read": true,
+      ".write": true
+    },
+    "appointments": {
+      ".read": true,
+      ".write": true
+    },
+    "centers": {
+      ".read": true,
+      ".write": true
+    },
+    "system_settings": {
+      ".read": true,
+      ".write": true
+    },
+    "incident_photos": {
+      ".read": true,
+      ".write": true
+    },
+    "report_vaccinations": {
+      ".read": true,
+      ".write": true
+    },
+    "vaccination_reminders_sent": {
+      ".read": true,
+      ".write": true
+    },
+    "announcements": {
+      ".read": true,
+      ".write": true
+    },
+    "dtr_records": {
+      ".read": true,
+      ".write": true
+    },
+    "staff_logs": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
