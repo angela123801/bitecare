@@ -12,6 +12,7 @@ export interface Profile {
   city: string;
   date_of_birth: string | null;
   is_active: boolean;
+  verification_status: 'pending_verification' | 'verified';
   created_at: string;
   updated_at: string;
 }

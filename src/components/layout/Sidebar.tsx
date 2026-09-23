@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Stethoscope,
+  UserPlus,
 } from 'lucide-react';
 
 interface NavItem {
@@ -70,6 +71,7 @@ function useNavItems(): NavItem[] {
       { label: 'Facilities', path: '/admin/facilities', icon: <Building2 className="w-5 h-5" /> },
       { label: 'Map', path: '/map', icon: <Map className="w-5 h-5" /> },
       { label: 'Users', path: '/admin/users', icon: <Users className="w-5 h-5" /> },
+      { label: 'Create Account', path: '/admin/users/new', icon: <UserPlus className="w-5 h-5" /> },
       { label: 'Education', path: '/admin/education', icon: <BookOpen className="w-5 h-5" /> },
       { label: 'Notifications', path: '/notifications', icon: <Bell className="w-5 h-5" /> },
       { label: 'Profile', path: '/profile', icon: <User className="w-5 h-5" /> },
@@ -85,6 +87,7 @@ function useNavItems(): NavItem[] {
     { label: 'Facilities', path: '/admin/facilities', icon: <Building2 className="w-5 h-5" /> },
     { label: 'Map', path: '/map', icon: <Map className="w-5 h-5" /> },
     { label: 'Users', path: '/admin/users', icon: <Users className="w-5 h-5" /> },
+    { label: 'Create Account', path: '/admin/users/new', icon: <UserPlus className="w-5 h-5" /> },
     { label: 'Education', path: '/admin/education', icon: <BookOpen className="w-5 h-5" /> },
     { label: 'Analytics', path: '/admin/analytics', icon: <BarChart3 className="w-5 h-5" /> },
     { label: 'Audit Log', path: '/admin/audit-log', icon: <ScrollText className="w-5 h-5" /> },

@@ -74,3 +74,6 @@ enabled = false
 
 [analytics]
 enabled = false
+
+[functions.account-admin]
+verify_jwt = true

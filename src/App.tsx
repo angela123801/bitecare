@@ -18,6 +18,7 @@ import ReportDetailPage from '@/pages/user/ReportDetailPage';
 import MyVaccinationsPage from '@/pages/user/MyVaccinationsPage';
 import AllReportsPage from '@/pages/admin/AllReportsPage';
 import UserManagementPage from '@/pages/admin/UserManagementPage';
+import CreateAccountPage from '@/pages/admin/CreateAccountPage';
 import FacilityManagementPage from '@/pages/admin/FacilityManagementPage';
 import EducationManagementPage from '@/pages/admin/EducationManagementPage';
 import VaccinationManagementPage from '@/pages/shared/VaccinationManagementPage';
@@ -66,6 +67,7 @@ export default function App() {
             <Route path="/admin/reports" element={<ProtectedRoute minRole="admin"><AllReportsPage /></ProtectedRoute>} />
             <Route path="/admin/reports/:id" element={<ProtectedRoute minRole="admin"><ReportDetailPage /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute minRole="admin"><UserManagementPage /></ProtectedRoute>} />
+            <Route path="/admin/users/new" element={<ProtectedRoute minRole="admin"><CreateAccountPage /></ProtectedRoute>} />
             <Route path="/admin/facilities" element={<ProtectedRoute minRole="admin"><FacilityManagementPage /></ProtectedRoute>} />
             <Route path="/admin/education" element={<ProtectedRoute minRole="admin"><EducationManagementPage /></ProtectedRoute>} />
 

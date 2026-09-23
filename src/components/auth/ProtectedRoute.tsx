@@ -40,6 +40,20 @@ export function ProtectedRoute({ children, minRole }: ProtectedRouteProps) {
     );
   }
 
+  if (profile.verification_status === 'pending_verification') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-xl shadow-sm border max-w-md text-center">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Verification Pending</h2>
+          <p className="text-gray-600 text-sm">
+            This account has not been verified yet. An administrator must confirm the verification
+            code before you can sign in.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (minRole && !isRoleAtLeast(minRole)) {
     return <Navigate to="/dashboard" replace />;
   }
