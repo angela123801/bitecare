@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLE_LABELS } from '@/config/constants';
 import {
@@ -20,7 +19,7 @@ function formatClock(total: number): string {
 }
 
 export default function LoginPage() {
-  const { signIn } = useAuth();
+  const { applySession } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const preselectedRole = searchParams.get('role') as UserRole | null;
@@ -129,20 +128,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Resolve staff_id to get email
-      const resolved = await invoke({ action: 'resolve', loginId: staffId.trim() });
-      if (resolved.role === 'user') { setError('This ID belongs to a resident. Use the resident login instead.'); setLoading(false); return; }
-
-      // Sign in with email+password
-      const profile = await signIn(resolved.email, password);
-      if (!profile) { setError('Invalid staff ID or password'); setLoading(false); return; }
-
-      // Send staff 2FA OTP
-      const otpRes = await invoke({ action: 'send_staff_otp', userId: profile.id });
+      // Verify password server-side and send the 2FA code in one call.
+      const otpRes = await invoke({ action: 'send_staff_otp', staffId: staffId.trim(), password });
       setDevOtp(otpRes.dev_otp || null);
-      setMaskedTarget(otpRes.masked_email || resolved.email);
-      setResolvedUserId(profile.id);
-      setResolvedEmail(resolved.email);
+      setMaskedTarget(otpRes.masked_email || 'your email');
+      setResolvedUserId(otpRes.user_id);
+      setResolvedEmail(otpRes.email);
       setOtpSent(true);
       setStep('otp');
     } catch (err: unknown) {
@@ -182,26 +173,22 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      if (resolvedRole === 'user' || (!resolvedRole && !staffId)) {
-        // Resident: verify OTP then sign in
-        const result = await invoke({ action: 'verify_resident_otp', userId: resolvedUserId, otp: code });
-        await signIn(result.email, result.password);
-        navigate('/dashboard', { replace: true });
+      if (isStaff) {
+        // Staff: verify OTP, then the server returns a session.
+        const result = await invoke({
+          action: 'verify_staff_otp',
+          userId: resolvedUserId,
+          otp: code,
+          email: resolvedEmail,
+          password,
+        });
+        await applySession(result.access_token, result.refresh_token);
       } else {
-        // Staff: verify OTP then complete sign-in (already signed in with password)
-        await invoke({ action: 'verify_staff_otp', userId: resolvedUserId, otp: code });
-
-        // Re-sign-in to refresh the session
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('id', resolvedUserId)
-          .maybeSingle();
-        if (profile) {
-          await signIn(profile.email, password);
-        }
-        navigate('/dashboard', { replace: true });
+        // Resident: verify OTP, then the server returns a session.
+        const result = await invoke({ action: 'verify_resident_otp', userId: resolvedUserId, otp: code });
+        await applySession(result.access_token, result.refresh_token);
       }
+      navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Verification failed');
       setDigits(Array(CODE_LENGTH).fill(''));
@@ -217,11 +204,11 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      if (resolvedRole === 'user' || !staffId) {
-        const otpRes = await invoke({ action: 'send_resident_otp', phone: phone.trim() });
+      if (isStaff) {
+        const otpRes = await invoke({ action: 'send_staff_otp', staffId: staffId.trim(), password });
         setDevOtp(otpRes.dev_otp || null);
       } else {
-        const otpRes = await invoke({ action: 'send_staff_otp', userId: resolvedUserId });
+        const otpRes = await invoke({ action: 'send_resident_otp', phone: phone.trim() });
         setDevOtp(otpRes.dev_otp || null);
       }
       setDigits(Array(CODE_LENGTH).fill(''));
@@ -298,7 +285,7 @@ export default function LoginPage() {
                         value={staffId}
                         onChange={(e) => setStaffId(e.target.value.toUpperCase())}
                         className="input-field pl-9"
-                        placeholder="SA-000001"
+                        placeholder="BC-SADM-000001"
                         required
                         autoComplete="username"
                       />

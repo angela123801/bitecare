@@ -231,7 +231,7 @@ export default function RegisterPage() {
   };
 
   const isStaff = form.role !== 'user';
-  const staffPrefix = form.role === 'super_admin' ? 'SA' : form.role === 'admin' ? 'AD' : form.role === 'health_worker' ? 'HW' : '';
+  const staffPrefix = form.role === 'super_admin' ? 'BC-SADM' : form.role === 'admin' ? 'BC-ADM' : form.role === 'health_worker' ? 'BC-HW' : '';
 
   return (
     <div

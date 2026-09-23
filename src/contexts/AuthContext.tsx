@@ -11,6 +11,7 @@ interface AuthState {
   profileLoading: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<Profile | null>;
+  applySession: (accessToken: string, refreshToken: string) => Promise<Profile | null>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
@@ -72,6 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
+    // Restore the persisted session first. Until this resolves, `loading`
+    // stays true so route guards show a loading state instead of redirecting
+    // an authenticated user to the role-selection page on refresh.
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       if (!mounted) return;
       setSession(s);
@@ -87,17 +91,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (mounted) setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+    // React to subsequent auth changes (sign in/out). INITIAL_SESSION is
+    // skipped because getSession() above already handles the first load; acting
+    // on it here would race and could clear a valid session mid-refresh.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       if (!mounted) return;
+      if (event === 'INITIAL_SESSION') return;
+
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        loadProfile(s.user.id).finally(() => {
-          if (mounted) setLoading(false);
-        });
+        loadProfile(s.user.id);
       } else {
         setProfile(null);
-        setLoading(false);
       }
     });
 
@@ -124,6 +130,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Load the profile before resolving so navigation to the dashboard
     // finds an authenticated user with a profile already in place, and so the
     // caller can compare the actual role against the one selected at login.
+    if (data.user?.id) {
+      return await loadProfile(data.user.id);
+    }
+    return null;
+  };
+
+  const applySession = async (accessToken: string, refreshToken: string): Promise<Profile | null> => {
+    const { data, error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (error) throw error;
     if (data.user?.id) {
       return await loadProfile(data.user.id);
     }
@@ -177,6 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profileLoading,
         signUp,
         signIn,
+        applySession,
         signOut,
         resetPassword,
         updatePassword,

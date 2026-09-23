@@ -19,7 +19,7 @@ function json(data: unknown, status = 200) {
 }
 
 function randomToken(): string {
-  const bytes = new Uint8Array(32);
+  const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -56,51 +56,77 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const action = body.action as string;
 
-    // --- Resolve login ID to profile ---
-    if (action === 'resolve') {
-      const { loginId } = body as { loginId: string };
-      if (!loginId) return json({ error: 'Please enter your login ID' }, 400);
-
-      const { data, error } = await adminClient.rpc('get_user_by_login_id', {
-        p_login_id: loginId.trim(),
-      });
-      if (error) return json({ error: error.message }, 500);
-      const result = data as Record<string, unknown>;
-      if (result?.error) return json({ error: String(result.error) }, 404);
-      return json(result);
-    }
-
-    // --- Send OTP for staff 2FA (after password verified on client) ---
+    // --- Staff: verify password, then send OTP (no session yet) ---
     if (action === 'send_staff_otp') {
-      const { userId } = body as { userId: string };
-      if (!userId) return json({ error: 'Missing user ID' }, 400);
+      const { staffId, password } = body as { staffId: string; password: string };
+      if (!staffId || !password) return json({ error: 'Please enter your staff ID and password' }, 400);
 
-      const { data: profile } = await adminClient
-        .from('profiles')
-        .select('email, full_name, role')
-        .eq('id', userId)
-        .maybeSingle();
+      // Resolve staff_id to the auth email.
+      const { data: resolved, error: resolveErr } = await adminClient.rpc('get_user_by_login_id', {
+        p_login_id: staffId.trim(),
+      });
+      if (resolveErr) return json({ error: resolveErr.message }, 500);
+      const r = resolved as Record<string, unknown>;
+      if (r?.error) return json({ error: String(r.error) }, 404);
+      if (r?.role === 'user') return json({ error: 'This ID belongs to a resident account' }, 400);
 
-      if (!profile) return json({ error: 'Account not found' }, 404);
-      if (profile.role === 'user') return json({ error: 'Staff accounts only' }, 400);
+      const email = r.email as string;
 
+      // Verify the password server-side. No session is created in the browser.
+      const { data: signInData, error: signInErr } = await adminClient.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInErr || !signInData.user) return json({ error: 'Invalid staff ID or password' }, 401);
+
+      // Generate and send the 2FA code.
       const { data: otpData, error: otpErr } = await adminClient.rpc('generate_staff_login_otp', {
-        p_user_id: userId,
+        p_user_id: signInData.user.id,
       });
       if (otpErr) return json({ error: otpErr.message }, 500);
 
       const code = (otpData as Record<string, unknown>)?.dev_otp as string;
-      const emailSent = await sendOtpEmail(profile.email, code, profile.full_name);
+      const emailSent = await sendOtpEmail(email, code, (r.full_name as string) || 'Staff');
 
       return json({
         ok: true,
+        user_id: signInData.user.id,
+        email,
         email_sent: emailSent,
         dev_otp: !emailSent ? code : undefined,
-        masked_email: profile.email.replace(/(.{2}).*(@.*)/, '$1***$2'),
+        masked_email: email.replace(/(.{2}).*(@.*)/, '$1***$2'),
       });
     }
 
-    // --- Send OTP for resident phone login ---
+    // --- Staff: verify OTP, then issue a session ---
+    if (action === 'verify_staff_otp') {
+      const { userId, otp, email, password } = body as { userId: string; otp: string; email: string; password: string };
+      if (!userId || !otp) return json({ error: 'Missing code' }, 400);
+
+      const { data: verifyResult, error: verifyErr } = await adminClient.rpc('verify_staff_login_otp', {
+        p_user_id: userId,
+        p_otp: String(otp).trim(),
+      });
+      if (verifyErr) return json({ error: verifyErr.message }, 500);
+
+      const vr = verifyResult as Record<string, unknown>;
+      if (vr?.error) return json({ error: String(vr.error) }, 400);
+
+      // OTP passed — now create the real session and return its tokens.
+      const { data: signInData, error: signInErr } = await adminClient.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInErr || !signInData.session) return json({ error: 'Could not start session' }, 500);
+
+      return json({
+        ok: true,
+        access_token: signInData.session.access_token,
+        refresh_token: signInData.session.refresh_token,
+      });
+    }
+
+    // --- Resident: send OTP to the registered phone ---
     if (action === 'send_resident_otp') {
       const { phone } = body as { phone: string };
       if (!phone) return json({ error: 'Please enter your phone number' }, 400);
@@ -139,7 +165,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // --- Verify resident OTP and create session credentials ---
+    // --- Resident: verify OTP, then issue a session ---
     if (action === 'verify_resident_otp') {
       const { userId, otp } = body as { userId: string; otp: string };
       if (!userId || !otp) return json({ error: 'Missing code' }, 400);
@@ -160,28 +186,23 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       if (!profile) return json({ error: 'Account not found' }, 404);
 
-      // Issue a one-time sign-in token the client can exchange for a session
-      const pass = randomToken();
-      await adminClient.auth.admin.updateUserById(userId, { password: pass });
+      // Residents sign in with phone + OTP only, so set a random one-time
+      // password and exchange it for a session. The client only ever sees
+      // the resulting tokens, never the password.
+      const tempPass = randomToken();
+      await adminClient.auth.admin.updateUserById(userId, { password: tempPass });
 
-      return json({ ok: true, email: profile.email, password: pass });
-    }
-
-    // --- Verify staff OTP ---
-    if (action === 'verify_staff_otp') {
-      const { userId, otp } = body as { userId: string; otp: string };
-      if (!userId || !otp) return json({ error: 'Missing code' }, 400);
-
-      const { data: verifyResult, error: verifyErr } = await adminClient.rpc('verify_staff_login_otp', {
-        p_user_id: userId,
-        p_otp: String(otp).trim(),
+      const { data: signInData, error: signInErr } = await adminClient.auth.signInWithPassword({
+        email: profile.email,
+        password: tempPass,
       });
-      if (verifyErr) return json({ error: verifyErr.message }, 500);
+      if (signInErr || !signInData.session) return json({ error: 'Could not start session' }, 500);
 
-      const vr = verifyResult as Record<string, unknown>;
-      if (vr?.error) return json({ error: String(vr.error) }, 400);
-
-      return json({ ok: true });
+      return json({
+        ok: true,
+        access_token: signInData.session.access_token,
+        refresh_token: signInData.session.refresh_token,
+      });
     }
 
     return json({ error: 'Unknown action' }, 400);
