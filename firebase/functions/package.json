@@ -1,0 +1,13 @@
+{
+  "name": "bitecare-functions",
+  "description": "BiteCare privileged operations (account provisioning, role administration).",
+  "main": "index.js",
+  "private": true,
+  "engines": {
+    "node": "20"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1"
+  }
+}

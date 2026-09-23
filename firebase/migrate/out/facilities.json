@@ -1,0 +1,50 @@
+[
+  {
+    "_id": "abc_center",
+    "name": "",
+    "type": "Clinic",
+    "address": "B.S. Aquino Dr, Bacolod City",
+    "barangayName": "",
+    "latitude": 10.6805,
+    "longitude": 122.9528,
+    "phone": "0917-123-4567",
+    "email": "",
+    "operatingHours": "",
+    "services": [],
+    "isActive": true,
+    "createdAt": "2026-09-23T06:24:31.686Z",
+    "updatedAt": "2026-09-23T06:24:31.686Z"
+  },
+  {
+    "_id": "cho_bacolod",
+    "name": "",
+    "type": "Hospital",
+    "address": "A.B. Parreño St., Bacolod City",
+    "barangayName": "",
+    "latitude": 10.6698,
+    "longitude": 122.9515,
+    "phone": "(034) 434 4098",
+    "email": "",
+    "operatingHours": "",
+    "services": [],
+    "isActive": true,
+    "createdAt": "2026-09-23T06:24:31.686Z",
+    "updatedAt": "2026-09-23T06:24:31.686Z"
+  },
+  {
+    "_id": "clmmrh",
+    "name": "",
+    "type": "Hospital",
+    "address": "Lacson St., Bacolod City",
+    "barangayName": "",
+    "latitude": 10.6834,
+    "longitude": 122.9567,
+    "phone": "(034) 706 6300",
+    "email": "",
+    "operatingHours": "",
+    "services": [],
+    "isActive": true,
+    "createdAt": "2026-09-23T06:24:31.686Z",
+    "updatedAt": "2026-09-23T06:24:31.686Z"
+  }
+]

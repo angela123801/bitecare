@@ -1,0 +1,268 @@
+rules_version = '2';
+
+// ============================================================================
+// BiteCare Firestore Security Rules
+// Default-deny. Authorization is enforced HERE, not in the frontend.
+// Frontend role checks are for UI only and are never trusted.
+//
+// Roles (authoritative, stored in users/{uid}.role):
+//   superadmin | admin | health_worker | resident
+//
+// Role-creation matrix enforced below:
+//   superadmin   -> may grant superadmin, admin, health_worker, resident
+//   admin        -> may grant health_worker, resident
+//   health_worker-> may grant resident
+//   resident     -> may grant nobody
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    // .get() with defaults throughout: a missing field must not raise an
+    // evaluation error (which would deny legitimate access) — it must simply
+    // evaluate to the safe default.
+    function callerRole() {
+      return signedIn()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '')
+        : '';
+    }
+
+    function callerActive() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isActive', false) == true;
+    }
+
+    // Any signed-in, non-deactivated account.
+    function active() {
+      return isVerified() && callerActive();
+    }
+
+    function isResident()      { return active() && callerRole() == 'resident'; }
+    function isHealthWorker()  { return active() && callerRole() == 'health_worker'; }
+    function isAdmin()         { return active() && callerRole() == 'admin'; }
+    function isSuperAdmin()    { return active() && callerRole() == 'superadmin'; }
+
+    // Staff = operational access to patient/clinical records.
+    function isStaff()  { return isHealthWorker() || isAdmin() || isSuperAdmin(); }
+    // Elevated = administrative access.
+    function isElevated() { return isAdmin() || isSuperAdmin(); }
+
+    // Is the caller allowed to hand out this role?
+    function canGrant(targetRole) {
+      return (isSuperAdmin() && targetRole in ['superadmin', 'admin', 'health_worker', 'resident'])
+          || (isAdmin() && targetRole in ['health_worker', 'resident'])
+          || (isHealthWorker() && targetRole == 'resident');
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Immutable-field guard for self-service profile updates.
+    // .get() defaults keep these safe when a document predates a field.
+    function roleUnchanged() {
+      return request.resource.data.get('role', 'resident') == resource.data.get('role', 'resident');
+    }
+    function statusUnchanged() {
+      return request.resource.data.get('isActive', false) == resource.data.get('isActive', false)
+          && request.resource.data.get('verificationStatus', 'unverified')
+             == resource.data.get('verificationStatus', 'unverified');
+    }
+    function ownerUnchanged() {
+      return request.resource.data.get('uid', '') == resource.data.get('uid', '')
+          && request.resource.data.get('ownerId', '') == resource.data.get('ownerId', '');
+    }
+
+    // ---------- users ----------
+    match /users/{uid} {
+
+      // Own document. Staff need to read users for case assignment; residents
+      // may read only themselves. Never readable by unsigned-in callers.
+      // NOTE: isSelf() deliberately does not require email verification — an
+      // account awaiting verification may still see its OWN pending profile,
+      // but gains access to nothing else. All other reads require `active()`.
+      allow read: if isSelf(uid)
+                  || isElevated()
+                  || (active() && isStaff());
+
+      // Self-signup: a brand-new account may only create itself AS A RESIDENT.
+      // This is the single most important line in this file: it is what makes
+      // self-promotion to superadmin impossible.
+      allow create: if isSelf(uid)
+                       && request.resource.data.uid == uid
+                       && request.resource.data.role == 'resident'
+                       && request.resource.data.isActive == true
+                       && request.resource.data.verificationStatus in ['unverified', 'pending', 'verified'];
+
+      // Privileged account creation for somebody else (admin console / Cloud
+      // Function path). Enforces the role-creation matrix.
+      allow create: if active()
+                       && uid != request.auth.uid
+                       && canGrant(request.resource.data.role);
+
+      // Self-service profile edit: own doc, role/status/uid frozen.
+      allow update: if isSelf(uid)
+                       && roleUnchanged()
+                       && statusUnchanged()
+                       && ownerUnchanged();
+
+      // Role or status change: matrix-governed, and never on yourself
+      // (no self-promotion even for a superadmin).
+      allow update: if active()
+                       && uid != request.auth.uid
+                       && (
+                            (request.resource.data.role != resource.data.role
+                              && canGrant(request.resource.data.role))
+                            ||
+                            (request.resource.data.isActive != resource.data.isActive && isElevated())
+                          );
+
+      // Accounts are deactivated, never hard-deleted from the client.
+      allow delete: if false;
+    }
+
+    // ---------- patients (clinical registry: staff only) ----------
+    match /patients/{patientId} {
+      allow read: if isStaff();
+      allow create: if isStaff()
+                       && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isStaff();
+      allow delete: if isElevated();
+    }
+
+    // ---------- bite reports ----------
+    match /biteReports/{reportId} {
+      // Residents see their own reports only. Staff see all.
+      allow read: if isStaff()
+                  || (isResident() && resource.data.reporterId == request.auth.uid);
+
+      allow create: if active()
+                       && request.resource.data.reporterId == request.auth.uid;
+
+      // Reporter may edit their own report; staff may edit any.
+      allow update: if isStaff()
+                    || (isResident()
+                        && resource.data.reporterId == request.auth.uid
+                        && request.resource.data.reporterId == request.auth.uid);
+
+      allow delete: if isElevated();
+
+      // Status history is append-only, written by staff.
+      match /statusHistory/{entryId} {
+        allow read: if isStaff()
+                    || (isResident() && get(/databases/$(database)/documents/biteReports/$(reportId)).data.reporterId == request.auth.uid);
+        allow create: if isStaff() && request.resource.data.actorId == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+
+    // ---------- incident photos (report-linked, sensitive) ----------
+    match /incidentPhotos/{photoId} {
+      allow read: if isStaff()
+                  || (isResident() && resource.data.ownerId == request.auth.uid);
+      allow create: if active()
+                       && request.resource.data.ownerId == request.auth.uid
+                       && request.resource.data.reportId is string;
+      allow update: if isStaff()
+                    || (isResident()
+                        && resource.data.ownerId == request.auth.uid
+                        && request.resource.data.ownerId == request.auth.uid);
+      allow delete: if isStaff()
+                    || (isResident() && resource.data.ownerId == request.auth.uid);
+    }
+
+    // ---------- vaccinations ----------
+    match /vaccinations/{vaccinationId} {
+      allow read: if isStaff()
+                  || (isResident() && resource.data.ownerId == request.auth.uid);
+      // Clinical records are written by staff only. Residents never author
+      // vaccination data.
+      allow create: if isStaff()
+                       && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isStaff();
+      allow delete: if isElevated();
+    }
+
+    // ---------- appointments ----------
+    match /appointments/{appointmentId} {
+      allow read: if isStaff()
+                  || (isResident() && resource.data.ownerId == request.auth.uid);
+      allow create: if active()
+                       && request.resource.data.ownerId == request.auth.uid;
+      // Staff manage any appointment; a resident may only act on their own
+      // (e.g. cancel) and may not reassign it to another person.
+      allow update: if isStaff()
+                    || (isResident()
+                        && resource.data.ownerId == request.auth.uid
+                        && request.resource.data.ownerId == request.auth.uid);
+      allow delete: if isElevated();
+    }
+
+    // ---------- notifications (per-user, persistent) ----------
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && resource.data.recipientId == request.auth.uid;
+      // Self-notify, or staff notify a resident.
+      allow create: if active()
+                       && ( request.resource.data.recipientId == request.auth.uid
+                            || isStaff() );
+      allow update: if signedIn()
+                       && resource.data.recipientId == request.auth.uid
+                       && request.resource.data.recipientId == resource.data.recipientId;
+      allow delete: if signedIn() && resource.data.recipientId == request.auth.uid;
+    }
+
+    // ---------- facilities (public-health info: read broadly, write admin+) ----------
+    match /facilities/{facilityId} {
+      allow read: if active();
+      allow create, update: if isElevated();
+      allow delete: if isSuperAdmin();
+    }
+
+    // ---------- barangays (reference data) ----------
+    match /barangays/{barangayId} {
+      allow read: if active();
+      allow write: if isElevated();
+    }
+
+    // ---------- education / first aid (readable to residents) ----------
+    match /education/{docId} {
+      allow read: if active();
+      allow write: if isElevated();
+    }
+
+    match /firstAidGuides/{docId} {
+      allow read: if active();
+      allow write: if isElevated();
+    }
+
+    // ---------- audit logs (append-only, admin-readable) ----------
+    match /auditLogs/{logId} {
+      allow read: if isElevated();
+      // Any active user may append a log of THEIR OWN action. No edits, no
+      // deletions, ever — an audit trail that can be rewritten is worthless.
+      allow create: if active()
+                       && request.resource.data.actorId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ---------- app settings ----------
+    match /appSettings/{key} {
+      allow read: if active();
+      allow write: if isSuperAdmin();
+    }
+
+    // ---------- default deny ----------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

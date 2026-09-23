@@ -1,0 +1,92 @@
+[
+  {
+    "_id": "-OuG3stDaMSqTo0iOhVJ",
+    "reporterId": "suRV6xtxMfT2a3Lh8vGyQaTFoz92",
+    "patientId": "pat_1_rollyjimdcel",
+    "patient": {
+      "name": "Rolly Jim D. Celeste",
+      "age": null,
+      "sex": null,
+      "phone": "",
+      "address": "",
+      "barangayId": null,
+      "barangayName": ""
+    },
+    "biteDate": "2026-01-04",
+    "biteTime": "13:18",
+    "animal": {
+      "type": "Cat",
+      "other": "",
+      "status": "",
+      "vaccinated": null
+    },
+    "wound": {
+      "site": "",
+      "type": "",
+      "category": null,
+      "count": null,
+      "provoked": null
+    },
+    "incident": {
+      "location": "",
+      "latitude": 10.6765,
+      "longitude": 122.9509
+    },
+    "status": "Pending",
+    "severity": null,
+    "assignedWorkerId": null,
+    "assignedFacilityId": null,
+    "firstAid": {
+      "given": null,
+      "details": ""
+    },
+    "notes": "",
+    "createdAt": "2026-06-04T05:20:41.729Z",
+    "updatedAt": "2026-06-04T05:20:41.729Z"
+  },
+  {
+    "_id": "-OuH4RbDYV0c-WVzLSsa",
+    "reporterId": "suRV6xtxMfT2a3Lh8vGyQaTFoz92",
+    "patientId": "pat_1_rollyjimdcel",
+    "patient": {
+      "name": "Rolly Jim D. Celeste",
+      "age": null,
+      "sex": null,
+      "phone": "",
+      "address": "",
+      "barangayId": null,
+      "barangayName": ""
+    },
+    "biteDate": "2026-04-01",
+    "biteTime": "18:00",
+    "animal": {
+      "type": "Dog",
+      "other": "",
+      "status": "",
+      "vaccinated": null
+    },
+    "wound": {
+      "site": "",
+      "type": "",
+      "category": null,
+      "count": null,
+      "provoked": null
+    },
+    "incident": {
+      "location": "",
+      "latitude": 10.6765,
+      "longitude": 122.9509
+    },
+    "status": "Pending",
+    "severity": null,
+    "assignedWorkerId": null,
+    "assignedFacilityId": null,
+    "firstAid": {
+      "given": null,
+      "details": ""
+    },
+    "notes": "",
+    "createdAt": "2026-06-04T10:02:42.946Z",
+    "updatedAt": "2026-06-04T10:02:42.946Z"
+  }
+]
