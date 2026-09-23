@@ -67,7 +67,7 @@ export default function ResetPasswordPage() {
               </div>
               <h2 className="text-lg font-bold text-gray-900 mb-2">Password updated</h2>
               <p className="text-sm text-gray-500 mb-6">Your password has been changed. Please sign in with your new password.</p>
-              <button type="button" onClick={() => navigate('/login', { replace: true })} className="btn-primary w-full py-2.5">
+              <button type="button" onClick={() => navigate('/', { replace: true })} className="btn-primary w-full py-2.5">
                 Go to sign in
               </button>
             </div>
@@ -152,7 +152,7 @@ export default function ResetPasswordPage() {
 
         {!done && (
           <p className="mt-5 text-center text-sm text-white/80 drop-shadow">
-            <Link to="/login" className="text-white font-semibold hover:underline">Back to sign in</Link>
+            <Link to="/" className="text-white font-semibold hover:underline">Back to sign in</Link>
           </p>
         )}
       </div>

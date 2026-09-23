@@ -72,7 +72,7 @@ export default function TopBar({ onMenuClick, unreadCount }: TopBarProps) {
       // left in a half-authenticated state; the guard will send them to login.
       console.error('Sign out error:', getErrorMessage(err));
     }
-    navigate('/login', { replace: true });
+    navigate('/', { replace: true });
   };
 
   return (

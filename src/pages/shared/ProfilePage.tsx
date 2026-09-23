@@ -16,6 +16,7 @@ import {
   Calendar,
   ShieldCheck,
   CheckCircle,
+  IdCard,
 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -245,6 +246,9 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <InfoRow icon={<User className="w-4 h-4" />} label="Full Name" value={profile.full_name} />
               <InfoRow icon={<Mail className="w-4 h-4" />} label="Email" value={profile.email} />
+              {profile.staff_id && (
+                <InfoRow icon={<IdCard className="w-4 h-4" />} label="Staff ID" value={profile.staff_id} />
+              )}
               <InfoRow icon={<Phone className="w-4 h-4" />} label="Phone" value={profile.phone} />
               <InfoRow icon={<Calendar className="w-4 h-4" />} label="Date of Birth" value={profile.date_of_birth ? formatDate(profile.date_of_birth) : '—'} />
               <InfoRow icon={<MapPin className="w-4 h-4" />} label="Address" value={profile.address} />

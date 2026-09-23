@@ -77,3 +77,6 @@ enabled = false
 
 [functions.account-admin]
 verify_jwt = true
+
+[functions.auth-login]
+verify_jwt = false

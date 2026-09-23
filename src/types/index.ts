@@ -7,6 +7,7 @@ export interface Profile {
   phone: string;
   avatar_url: string;
   role: UserRole;
+  staff_id: string | null;
   barangay_id: string | null;
   address: string;
   city: string;
