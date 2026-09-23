@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import type { Barangay } from '@/types';
+import type { Barangay, UserRole } from '@/types';
+import { ROLE_LABELS } from '@/config/constants';
+import { LOGIN_ROLES } from '@/lib/navigation';
 import { getErrorMessage } from '@/lib/utils';
-import { Eye, EyeOff, Loader2, ChevronDown, AlertCircle, Lock } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ChevronDown, AlertCircle, Lock, ShieldCheck } from 'lucide-react';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -14,8 +16,10 @@ export default function RegisterPage() {
     confirmPassword: '',
     phone: '',
     barangayId: '',
+    role: 'user' as UserRole,
   });
   const [barangays, setBarangays] = useState<Barangay[]>([]);
+  const [openRegistration, setOpenRegistration] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,6 +28,17 @@ export default function RegisterPage() {
     supabase.from('barangays').select('*').order('name').then(({ data, error }) => {
       if (error) { setError(getErrorMessage(error, 'Failed to load barangays')); return; }
       if (data) setBarangays(data);
+    });
+  }, []);
+
+  useEffect(() => {
+    supabase.rpc('is_open_registration_enabled').then(({ data, error }) => {
+      if (error) {
+        // Default to the safe locked behaviour if the switch cannot be read.
+        console.error('Could not read registration setting:', getErrorMessage(error));
+        return;
+      }
+      setOpenRegistration(data === true);
     });
   }, []);
 
@@ -54,16 +69,16 @@ export default function RegisterPage() {
       if (signUpError) throw signUpError;
 
       const { data: userData } = await supabase.auth.getUser();
-      if (userData.user && (form.phone || form.barangayId)) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            phone: form.phone || '',
-            barangay_id: form.barangayId || null,
-          })
-          .eq('id', userData.user.id);
-        if (profileError) throw profileError;
-      }
+      if (!userData.user) throw new Error('Account was created but no session was established. Please sign in.');
+
+      // Records the selected role, name, phone and barangay in one step.
+      const { error: completeError } = await supabase.rpc('public_complete_registration', {
+        p_role: form.role,
+        p_full_name: form.fullName.trim(),
+        p_phone: form.phone || '',
+        p_barangay_id: form.barangayId || null,
+      });
+      if (completeError) throw completeError;
 
       navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
@@ -101,7 +116,7 @@ export default function RegisterPage() {
 
         <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-7">
           <h2 className="text-xl font-bold text-gray-900 mb-1">Get started</h2>
-          <p className="text-gray-500 text-sm mb-5">Register as a resident of Bacolod City</p>
+          <p className="text-gray-500 text-sm mb-5">Create your BiteCare account</p>
 
           {error && (
             <div className="mb-4 p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm flex items-center gap-2">
@@ -120,23 +135,42 @@ export default function RegisterPage() {
               <input id="email" type="email" value={form.email} onChange={set('email')} className="input-field" placeholder="you@example.com" required autoComplete="email" />
             </div>
 
-            <div>
-              <label htmlFor="registerRole" className="block text-sm font-medium text-gray-700 mb-1">Account role</label>
-              <div className="relative">
-                <input
-                  id="registerRole"
-                  type="text"
-                  value="Resident"
-                  readOnly
-                  disabled
-                  className="input-field bg-gray-100 text-gray-600 cursor-not-allowed"
-                />
-                <Lock className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            {openRegistration ? (
+              <div>
+                <label htmlFor="registerRole" className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1">
+                  <ShieldCheck className="w-4 h-4 text-primary-600" />
+                  Select account role
+                </label>
+                <div className="relative">
+                  <select id="registerRole" value={form.role} onChange={set('role')} className="input-field appearance-none pr-10" required>
+                    {LOGIN_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                </div>
+                <p className="text-xs text-warning-700 bg-warning-50 border border-warning-200 rounded-lg px-2.5 py-2 mt-2">
+                  Open registration is enabled for setup and presentation. The role you choose becomes your
+                  permanent account role.
+                </p>
               </div>
-              <p className="text-xs text-gray-400 mt-1.5">
-                Public registration creates Resident accounts only. Staff roles are assigned by an administrator.
-              </p>
-            </div>
+            ) : (
+              <div>
+                <label htmlFor="registerRole" className="block text-sm font-medium text-gray-700 mb-1">Account role</label>
+                <div className="relative">
+                  <input
+                    id="registerRole"
+                    type="text"
+                    value="Resident"
+                    readOnly
+                    disabled
+                    className="input-field bg-gray-100 text-gray-600 cursor-not-allowed"
+                  />
+                  <Lock className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  Public registration creates Resident accounts only. Staff roles are assigned by an administrator.
+                </p>
+              </div>
+            )}
 
             <div>
               <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">Contact number (optional)</label>
