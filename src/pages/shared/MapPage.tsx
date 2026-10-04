@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import { supabase } from '@/lib/supabase';
 import { BACOLOD_CENTER, DEFAULT_ZOOM, FACILITY_TYPE_LABELS, ANIMAL_TYPE_LABELS, REPORT_STATUS_LABELS } from '@/config/constants';
 import { formatDate, getErrorMessage } from '@/lib/utils';
-import { useMapReports, type MapFilters } from '@/lib/mapReports';
+import { useMapReports, EMPTY_FILTERS, type MapFilters } from '@/lib/mapReports';
 import { buildHeatPoints } from '@/lib/heatmap';
 import HeatmapLayer from '@/components/map/HeatmapLayer';
 import HeatmapLegend from '@/components/map/HeatmapLegend';
@@ -100,9 +100,7 @@ export default function MapPage() {
   const [showReports, setShowReports] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(true);
   const [showLayers, setShowLayers] = useState(false);
-  const [filters, setFilters] = useState<MapFilters>({
-    dateFrom: '', dateTo: '', barangayId: '', animalType: '', status: '',
-  });
+  const [filters, setFilters] = useState<MapFilters>(EMPTY_FILTERS);
 
   const { reports, loading: reportsLoading, error: reportsError } = useMapReports(filters);
 
