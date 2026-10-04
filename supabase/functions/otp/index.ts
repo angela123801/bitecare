@@ -19,6 +19,10 @@ const EMAIL_FROM = Deno.env.get('EMAIL_FROM') ?? 'BiteCare <onboarding@resend.de
 // Twilio and Vonage remain as fallbacks. The first configured one is used.
 const TEXTBEE_API_KEY = Deno.env.get('TEXTBEE_API_KEY');
 const TEXTBEE_DEVICE_ID = Deno.env.get('TEXTBEE_DEVICE_ID');
+// Which SIM in the gateway phone sends the messages. The phone's default SIM is
+// used when unset. Android reassigns these ids when a SIM is swapped, so read
+// the current value from the SIM Cards screen in the textbee app.
+const TEXTBEE_SIM_ID = Deno.env.get('TEXTBEE_SIM_ID');
 const SEMAPHORE_API_KEY = Deno.env.get('SEMAPHORE_API_KEY');
 const SEMAPHORE_SENDER = Deno.env.get('SEMAPHORE_SENDER_NAME');
 const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
@@ -71,6 +75,8 @@ function toInternationalPh(phone: string): string {
   if (digits.startsWith('0')) return `+63${digits.slice(1)}`;
   return `+63${digits}`;
 }
+
+const textbeeSimId = Number(TEXTBEE_SIM_ID);
 
 function emailConfigured(): boolean {
   return Boolean(RESEND_API_KEY);
@@ -148,6 +154,7 @@ async function sendSms(to: string, purpose: Purpose, code: string): Promise<bool
           recipients: [toInternationalPh(to)],
           message: text,
           ...(TEXTBEE_DEVICE_ID ? { deviceId: TEXTBEE_DEVICE_ID } : {}),
+          ...(Number.isInteger(textbeeSimId) ? { simSubscriptionId: textbeeSimId } : {}),
         }),
       });
       if (!res.ok) return false;
