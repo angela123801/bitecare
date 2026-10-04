@@ -14,8 +14,11 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const EMAIL_FROM = Deno.env.get('EMAIL_FROM') ?? 'BiteCare <onboarding@resend.dev>';
 
-// SMS providers. Semaphore is the Philippine-focused default; Twilio and
-// Vonage are supported as alternatives. The first configured one is used.
+// SMS providers. TextBee is the free default: it sends through an Android
+// phone paired with the account, so it costs nothing per message. Semaphore,
+// Twilio and Vonage remain as fallbacks. The first configured one is used.
+const TEXTBEE_API_KEY = Deno.env.get('TEXTBEE_API_KEY');
+const TEXTBEE_DEVICE_ID = Deno.env.get('TEXTBEE_DEVICE_ID');
 const SEMAPHORE_API_KEY = Deno.env.get('SEMAPHORE_API_KEY');
 const SEMAPHORE_SENDER = Deno.env.get('SEMAPHORE_SENDER_NAME');
 const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
@@ -61,11 +64,20 @@ function isValidPhMobile(phone: string): boolean {
   return /^09[0-9]{9}$/.test(phone);
 }
 
+/** TextBee requires international format, so 09XXXXXXXXX becomes +639XXXXXXXXX. */
+function toInternationalPh(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('63')) return `+${digits}`;
+  if (digits.startsWith('0')) return `+63${digits.slice(1)}`;
+  return `+63${digits}`;
+}
+
 function emailConfigured(): boolean {
   return Boolean(RESEND_API_KEY);
 }
 
-function smsProvider(): 'semaphore' | 'twilio' | 'vonage' | null {
+function smsProvider(): 'textbee' | 'semaphore' | 'twilio' | 'vonage' | null {
+  if (TEXTBEE_API_KEY) return 'textbee';
   if (SEMAPHORE_API_KEY) return 'semaphore';
   if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_FROM) return 'twilio';
   if (VONAGE_API_KEY && VONAGE_API_SECRET && VONAGE_FROM) return 'vonage';
@@ -128,6 +140,23 @@ async function sendSms(to: string, purpose: Purpose, code: string): Promise<bool
   const provider = smsProvider();
   const text = otpMessage(purpose, code);
   try {
+    if (provider === 'textbee') {
+      const res = await fetch('https://api.textbee.dev/api/v1/gateway/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': TEXTBEE_API_KEY! },
+        body: JSON.stringify({
+          recipients: [toInternationalPh(to)],
+          message: text,
+          ...(TEXTBEE_DEVICE_ID ? { deviceId: TEXTBEE_DEVICE_ID } : {}),
+        }),
+      });
+      if (!res.ok) return false;
+      // A 200 only means the phone accepted the message into its queue; the
+      // device still has to be online to actually send it.
+      const data = await res.json().catch(() => null);
+      return data?.data?.success !== false;
+    }
+
     if (provider === 'semaphore') {
       const res = await fetch('https://api.semaphore.co/api/v4/messages', {
         method: 'POST',
