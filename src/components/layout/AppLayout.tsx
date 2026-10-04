@@ -44,7 +44,7 @@ export default function AppLayout() {
         )}
       >
         <TopBar onMenuClick={() => setMobileOpen(true)} unreadCount={unreadCount} />
-        <main className="flex-1 p-4 lg:p-6 pb-20 lg:pb-6">
+        <main className="flex-1 p-4 lg:p-6 pb-mobile-nav lg:pb-6">
           <Outlet context={{ refreshNotifications: fetchUnread }} />
         </main>
       </div>
