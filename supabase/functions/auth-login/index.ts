@@ -18,11 +18,6 @@ function json(data: unknown, status = 200) {
   });
 }
 
-function randomToken(): string {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-}
 
 async function sendOtpEmail(email: string, code: string, name: string): Promise<boolean> {
   if (!RESEND_API_KEY) return false;
@@ -126,7 +121,44 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // --- Resident: send OTP to the registered phone ---
+    // --- Resident: login with phone number + password ---
+    if (action === 'resident_login') {
+      const { phone, password } = body as { phone: string; password: string };
+      if (!phone || !password) return json({ error: 'Please enter your phone number and password' }, 400);
+
+      // Resolve the phone number to an auth account.
+      const { data, error: resolveErr } = await adminClient.rpc('get_user_by_login_id', {
+        p_login_id: phone.trim(),
+      });
+      if (resolveErr) return json({ error: resolveErr.message }, 500);
+      const resolved = data as Record<string, unknown>;
+      if (resolved?.error) return json({ error: 'No account found with this phone number' }, 404);
+      if (resolved?.role !== 'user') {
+        return json({ error: 'This number belongs to a staff account. Use the staff login instead.' }, 400);
+      }
+      if (resolved?.is_active === false) {
+        return json({ error: 'Your account has been deactivated. Contact an administrator.' }, 403);
+      }
+
+      const email = resolved.email as string;
+
+      // Verify the resident's password through Supabase Auth.
+      const { data: signInData, error: signInErr } = await adminClient.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInErr || !signInData.session) {
+        return json({ error: 'Incorrect phone number or password' }, 401);
+      }
+
+      return json({
+        ok: true,
+        access_token: signInData.session.access_token,
+        refresh_token: signInData.session.refresh_token,
+      });
+    }
+
+    // --- Resident: send OTP (registration verification only) ---
     if (action === 'send_resident_otp') {
       const { phone } = body as { phone: string };
       if (!phone) return json({ error: 'Please enter your phone number' }, 400);
@@ -165,7 +197,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // --- Resident: verify OTP, then issue a session ---
+    // --- Resident: verify OTP (registration verification only) ---
     if (action === 'verify_resident_otp') {
       const { userId, otp } = body as { userId: string; otp: string };
       if (!userId || !otp) return json({ error: 'Missing code' }, 400);
@@ -179,29 +211,33 @@ Deno.serve(async (req: Request) => {
       const vr = verifyResult as Record<string, unknown>;
       if (vr?.error) return json({ error: String(vr.error) }, 400);
 
-      const { data: profile } = await adminClient
-        .from('profiles')
-        .select('email')
-        .eq('id', userId)
-        .maybeSingle();
-      if (!profile) return json({ error: 'Account not found' }, 404);
+      return json({ ok: true });
+    }
 
-      // Residents sign in with phone + OTP only, so set a random one-time
-      // password and exchange it for a session. The client only ever sees
-      // the resulting tokens, never the password.
-      const tempPass = randomToken();
-      await adminClient.auth.admin.updateUserById(userId, { password: tempPass });
+    // --- Resident: forgot password (reset via email) ---
+    if (action === 'resident_forgot_password') {
+      const { phone } = body as { phone: string };
+      if (!phone) return json({ error: 'Please enter your phone number' }, 400);
 
-      const { data: signInData, error: signInErr } = await adminClient.auth.signInWithPassword({
-        email: profile.email,
-        password: tempPass,
+      const { data } = await adminClient.rpc('get_user_by_login_id', {
+        p_login_id: phone.trim(),
       });
-      if (signInErr || !signInData.session) return json({ error: 'Could not start session' }, 500);
+      const resolved = data as Record<string, unknown>;
+      if (resolved?.error) return json({ error: 'No account found with this phone number' }, 404);
+      if (resolved?.role !== 'user') {
+        return json({ error: 'This number belongs to a staff account.' }, 400);
+      }
+
+      const email = resolved.email as string;
+      // Supabase will send a password-reset email to the resident's email.
+      const { error: resetErr } = await adminClient.auth.resetPasswordForEmail(email, {
+        redirectTo: `${req.headers.get('origin') ?? ''}/reset-password`,
+      });
+      if (resetErr) return json({ error: 'Could not send reset email' }, 500);
 
       return json({
         ok: true,
-        access_token: signInData.session.access_token,
-        refresh_token: signInData.session.refresh_token,
+        masked_email: email.replace(/(.{2}).*(@.*)/, '$1***$2'),
       });
     }
 

@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ROLE_LABELS } from '@/config/constants';
 import {
   Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, Phone, IdCard, ArrowLeft,
-  Mail, CheckCircle2, RefreshCw, X,
+  RefreshCw,
 } from 'lucide-react';
 import type { UserRole } from '@/types';
 import { useInstallApp } from '@/lib/installPrompt';
@@ -34,14 +34,13 @@ export default function LoginPage() {
   const [resolvedRole, setResolvedRole] = useState<UserRole | null>(preselectedRole);
 
   // Shared
-  const [step, setStep] = useState<'input' | 'otp' | 'success'>(preselectedRole ? 'input' : 'input');
+  const [step, setStep] = useState<'input' | 'otp'>(preselectedRole ? 'input' : 'input');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
   const [resolvedEmail, setResolvedEmail] = useState('');
   const [maskedTarget, setMaskedTarget] = useState('');
   const [devOtp, setDevOtp] = useState<string | null>(null);
-  const [otpSent, setOtpSent] = useState(false);
 
   // Countdowns
   const [secondsLeft, setSecondsLeft] = useState(600);
@@ -134,7 +133,6 @@ export default function LoginPage() {
       setMaskedTarget(otpRes.masked_email || 'your email');
       setResolvedUserId(otpRes.user_id);
       setResolvedEmail(otpRes.email);
-      setOtpSent(true);
       setStep('otp');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -148,23 +146,21 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     if (!phone.trim()) { setError('Please enter your phone number'); return; }
+    if (!password) { setError('Please enter your password'); return; }
 
     setLoading(true);
     try {
-      const otpRes = await invoke({ action: 'send_resident_otp', phone: phone.trim() });
-      setDevOtp(otpRes.dev_otp || null);
-      setMaskedTarget(otpRes.masked_phone || phone);
-      setResolvedUserId(otpRes.user_id);
-      setOtpSent(true);
-      setStep('otp');
+      const result = await invoke({ action: 'resident_login', phone: phone.trim(), password });
+      await applySession(result.access_token, result.refresh_token);
+      navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Could not send verification code');
+      setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setLoading(false);
     }
   };
 
-  // --- Verify OTP ---
+  // --- Verify OTP (staff 2FA only) ---
   const handleVerifyOtp = async () => {
     const code = digits.join('');
     if (code.length !== CODE_LENGTH) { setError('Enter all 6 digits'); return; }
@@ -173,21 +169,15 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      if (isStaff) {
-        // Staff: verify OTP, then the server returns a session.
-        const result = await invoke({
-          action: 'verify_staff_otp',
-          userId: resolvedUserId,
-          otp: code,
-          email: resolvedEmail,
-          password,
-        });
-        await applySession(result.access_token, result.refresh_token);
-      } else {
-        // Resident: verify OTP, then the server returns a session.
-        const result = await invoke({ action: 'verify_resident_otp', userId: resolvedUserId, otp: code });
-        await applySession(result.access_token, result.refresh_token);
-      }
+      // Staff: verify OTP, then the server returns a session.
+      const result = await invoke({
+        action: 'verify_staff_otp',
+        userId: resolvedUserId,
+        otp: code,
+        email: resolvedEmail,
+        password,
+      });
+      await applySession(result.access_token, result.refresh_token);
       navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Verification failed');
@@ -198,19 +188,14 @@ export default function LoginPage() {
     }
   };
 
-  // --- Resend OTP ---
+  // --- Resend OTP (staff only) ---
   const handleResend = async () => {
     if (resendIn > 0 || loading || !resolvedUserId) return;
     setLoading(true);
     setError('');
     try {
-      if (isStaff) {
-        const otpRes = await invoke({ action: 'send_staff_otp', staffId: staffId.trim(), password });
-        setDevOtp(otpRes.dev_otp || null);
-      } else {
-        const otpRes = await invoke({ action: 'send_resident_otp', phone: phone.trim() });
-        setDevOtp(otpRes.dev_otp || null);
-      }
+      const otpRes = await invoke({ action: 'send_staff_otp', staffId: staffId.trim(), password });
+      setDevOtp(otpRes.dev_otp || null);
       setDigits(Array(CODE_LENGTH).fill(''));
       setSecondsLeft(600);
       setResendIn(60);
@@ -224,7 +209,6 @@ export default function LoginPage() {
 
   const goBack = () => {
     setStep('input');
-    setOtpSent(false);
     setError('');
     setDevOtp(null);
     setResolvedUserId(null);
@@ -264,7 +248,7 @@ export default function LoginPage() {
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-1">Welcome back</h2>
               <p className="text-gray-500 text-sm mb-5">
-                {isStaff ? 'Sign in with your staff ID and password' : 'Sign in with your phone number'}
+                {isStaff ? 'Sign in with your staff ID and password' : 'Sign in with your phone number and password'}
               </p>
 
               {error && (
@@ -341,9 +325,34 @@ export default function LoginPage() {
                     </div>
                   </div>
 
+                  <div>
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <div className="relative">
+                      <input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="input-field pr-10"
+                        placeholder="Enter your password"
+                        required
+                        autoComplete="current-password"
+                      />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Link to="/reset-password" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                      Forgot password?
+                    </Link>
+                  </div>
+
                   <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 py-2.5">
                     {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {loading ? 'Sending code...' : 'Send verification code'}
+                    {loading ? 'Signing in...' : 'Login'}
                   </button>
                 </form>
               )}
