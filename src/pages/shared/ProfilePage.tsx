@@ -4,7 +4,7 @@ import { uploadAvatar, getSignedUrl } from '@/lib/storage';
 import { formatDate, getInitials, cn, getErrorMessage } from '@/lib/utils';
 import { ROLE_LABELS } from '@/config/constants';
 import OtpPanel from '@/components/auth/OtpPanel';
-import { sendOtp, verifyOtp, OtpError, type OtpChannel, type OtpChannelOption } from '@/lib/otp';
+import { sendOtp, verifyOtp, otpDeliveryMessage, OtpError, type OtpChannel, type OtpChannelOption } from '@/lib/otp';
 import {
   Camera,
   Loader2,
@@ -139,11 +139,7 @@ export default function ProfilePage() {
         setExpiresIn(result.expires_in);
         setResendIn(result.resend_in);
         setResetSignal((n) => n + 1);
-        setOtpInfo(
-          result.delivered
-            ? 'A confirmation code was sent by SMS.'
-            : 'No SMS provider is configured, so delivery is unavailable.',
-        );
+        setOtpInfo(otpDeliveryMessage('sms', result.delivered, result.provider_configured));
         setVerifyingPhone(true);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Could not send the confirmation code');

@@ -11,6 +11,7 @@ import {
   fetchOtpChannels,
   sendOtp,
   verifyOtp,
+  otpDeliveryMessage,
   OtpError,
   type OtpChannel,
   type OtpChannelOption,
@@ -67,11 +68,7 @@ export default function LoginPage() {
     setExpiresIn(result.expires_in);
     setResendIn(result.resend_in);
     setResetSignal((n) => n + 1);
-    setInfo(
-      result.delivered
-        ? `A new code was sent by ${result.channel === 'email' ? 'email' : 'SMS'}.`
-        : `No ${result.channel === 'email' ? 'email' : 'SMS'} provider is configured, so delivery is unavailable.`,
-    );
+    setInfo(otpDeliveryMessage(result.channel, result.delivered, result.provider_configured));
     return result;
   };
 

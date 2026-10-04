@@ -55,6 +55,22 @@ export const CHANNEL_LABELS: Record<OtpChannel, string> = {
   sms: 'SMS',
 };
 
+/**
+ * Plain-language outcome for a code send. Keeps "no provider is set up" apart
+ * from "a provider is set up but the send failed" — a rejected or expired key
+ * must not read to the user as if delivery was never configured.
+ */
+export function otpDeliveryMessage(
+  channel: OtpChannel,
+  delivered: boolean,
+  providerConfigured: boolean,
+): string {
+  const label = channel === 'email' ? 'email' : 'SMS';
+  if (delivered) return `A new code was sent by ${label}.`;
+  if (!providerConfigured) return `No ${label} provider is configured, so delivery is unavailable.`;
+  return `We couldn't send the ${label} code right now. Please try again in a moment.`;
+}
+
 async function call<T>(body: Record<string, unknown>): Promise<T> {
   const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/otp`;
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;

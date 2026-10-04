@@ -14,6 +14,7 @@ import {
   sendOtp,
   verifyOtp,
   allowedChannelsForRole,
+  otpDeliveryMessage,
   OtpError,
   type OtpChannel,
   type OtpChannelOption,
@@ -76,11 +77,7 @@ export default function RegisterPage() {
     setExpiresIn(result.expires_in);
     setResendIn(result.resend_in);
     setResetSignal((n) => n + 1);
-    setOtpInfo(
-      result.delivered
-        ? `A new code was sent by ${channel === 'email' ? 'email' : 'SMS'}.`
-        : `No ${channel === 'email' ? 'email' : 'SMS'} provider is configured, so delivery is unavailable.`,
-    );
+    setOtpInfo(otpDeliveryMessage(channel, result.delivered, result.provider_configured));
   };
 
   // --- Create account, then send the verification code ---
