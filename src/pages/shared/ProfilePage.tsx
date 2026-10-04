@@ -3,6 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { uploadAvatar, getSignedUrl } from '@/lib/storage';
 import { formatDate, getInitials, cn, getErrorMessage } from '@/lib/utils';
 import { ROLE_LABELS } from '@/config/constants';
+import OtpPanel from '@/components/auth/OtpPanel';
+import { sendOtp, verifyOtp, OtpError, type OtpChannel, type OtpChannelOption } from '@/lib/otp';
 import {
   Camera,
   Loader2,
@@ -19,8 +21,13 @@ import {
   IdCard,
 } from 'lucide-react';
 
+/** Normalize to digits so formatting differences do not look like a change. */
+function normalizePhone(phone: string): string {
+  return (phone || '').replace(/\D/g, '');
+}
+
 export default function ProfilePage() {
-  const { user, profile, updateProfile, loading: authLoading } = useAuth();
+  const { user, profile, updateProfile, loading: authLoading, refreshProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -35,6 +42,19 @@ export default function ProfilePage() {
     city: '',
     date_of_birth: '',
   });
+
+  // Phone-change verification
+  const [verifyingPhone, setVerifyingPhone] = useState(false);
+  const [pendingForm, setPendingForm] = useState<typeof form | null>(null);
+  const [channels, setChannels] = useState<OtpChannelOption[]>([]);
+  const [selectedChannel, setSelectedChannel] = useState<OtpChannel>('sms');
+  const [destinationMasked, setDestinationMasked] = useState('');
+  const [expiresIn, setExpiresIn] = useState(300);
+  const [resendIn, setResendIn] = useState(60);
+  const [resetSignal, setResetSignal] = useState(0);
+  const [otpError, setOtpError] = useState('');
+  const [otpInfo, setOtpInfo] = useState('');
+  const [otpBusy, setOtpBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -83,23 +103,113 @@ export default function ProfilePage() {
     setError('');
   };
 
+  const saveFields = async (values: typeof form) => {
+    await updateProfile({ ...values, date_of_birth: values.date_of_birth || null });
+    setEditing(false);
+    setSuccess('Profile updated successfully');
+    setTimeout(() => setSuccess(''), 3000);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.full_name.trim()) {
       setError('Full name is required');
       return;
     }
+
+    // A changed phone number must be verified before it is saved: for a
+    // resident the phone number is the login ID.
+    if (normalizePhone(form.phone) !== normalizePhone(profile.phone)) {
+      const normalized = normalizePhone(form.phone);
+      if (!/^09[0-9]{9}$/.test(normalized)) {
+        setError('Enter a valid Philippine mobile number (09XXXXXXXXX).');
+        return;
+      }
+      setError('');
+      setPendingForm({ ...form, phone: normalized });
+      setChannels([{ channel: 'sms', destination_masked: normalized.slice(0, 4) + '****' + normalized.slice(-2) }]);
+      setSelectedChannel('sms');
+      setDestinationMasked(normalized.slice(0, 4) + '****' + normalized.slice(-2));
+      setOtpError('');
+      setOtpInfo('');
+      setOtpBusy(true);
+      try {
+        const result = await sendOtp({ purpose: 'contact_change', channel: 'sms', newPhone: normalized });
+        setDestinationMasked(result.destination_masked);
+        setExpiresIn(result.expires_in);
+        setResendIn(result.resend_in);
+        setResetSignal((n) => n + 1);
+        setOtpInfo(
+          result.delivered
+            ? 'A confirmation code was sent by SMS.'
+            : 'No SMS provider is configured, so delivery is unavailable.',
+        );
+        setVerifyingPhone(true);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Could not send the confirmation code');
+        setPendingForm(null);
+      } finally {
+        setOtpBusy(false);
+      }
+      return;
+    }
+
     setSaving(true);
     setError('');
     try {
-      await updateProfile({ ...form, date_of_birth: form.date_of_birth || null });
-      setEditing(false);
-      setSuccess('Profile updated successfully');
-      setTimeout(() => setSuccess(''), 3000);
+      await saveFields(form);
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to update profile'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResendPhone = async () => {
+    if (resendIn > 0 || otpBusy || !pendingForm) return;
+    setOtpBusy(true);
+    setOtpError('');
+    try {
+      const result = await sendOtp({ purpose: 'contact_change', channel: 'sms', newPhone: pendingForm.phone });
+      setDestinationMasked(result.destination_masked);
+      setExpiresIn(result.expires_in);
+      setResendIn(result.resend_in);
+      setResetSignal((n) => n + 1);
+    } catch (err: unknown) {
+      setOtpError(err instanceof Error ? err.message : 'Could not resend the code');
+    } finally {
+      setOtpBusy(false);
+    }
+  };
+
+  const handleVerifyPhone = async (code: string) => {
+    if (!pendingForm) return;
+    setOtpBusy(true);
+    setOtpError('');
+    try {
+      // The server writes the verified number to the profile. Save the other
+      // edited fields only, so the new phone number is not overwritten.
+      await verifyOtp({ purpose: 'contact_change', otp: code });
+      await updateProfile({
+        full_name: pendingForm.full_name,
+        address: pendingForm.address,
+        city: pendingForm.city,
+        date_of_birth: pendingForm.date_of_birth || null,
+      });
+      await refreshProfile();
+      setVerifyingPhone(false);
+      setPendingForm(null);
+      setSuccess('Phone number verified and updated');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Verification failed';
+      setOtpError(
+        err instanceof OtpError && typeof err.attemptsLeft === 'number'
+          ? `${message} (${err.attemptsLeft} attempt${err.attemptsLeft === 1 ? '' : 's'} left)`
+          : message,
+      );
+    } finally {
+      setOtpBusy(false);
     }
   };
 
@@ -123,6 +233,34 @@ export default function ProfilePage() {
 
   const fieldClass =
     'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm';
+
+  // While a phone change is awaiting its code, show the OTP panel instead.
+  if (verifyingPhone) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <OtpPanel
+            channels={channels}
+            selectedChannel={selectedChannel}
+            onSelectChannel={() => {}}
+            destinationMasked={destinationMasked}
+            expiresIn={expiresIn}
+            resendIn={resendIn}
+            resetSignal={resetSignal}
+            verifying={otpBusy}
+            resending={otpBusy}
+            error={otpError}
+            info={otpInfo}
+            onVerify={handleVerifyPhone}
+            onResend={handleResendPhone}
+            onBack={() => { setVerifyingPhone(false); setPendingForm(null); setOtpError(''); setOtpInfo(''); }}
+            title="Confirm your new number"
+            subtitle="Enter the 6-digit code we sent"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
@@ -217,6 +355,7 @@ export default function ProfilePage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                 <input className={fieldClass} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                <p className="text-xs text-gray-400 mt-1">Changing this requires SMS verification.</p>
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>

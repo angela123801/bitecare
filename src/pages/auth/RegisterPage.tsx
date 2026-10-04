@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import type { Barangay, UserRole } from '@/types';
@@ -7,16 +7,17 @@ import { LOGIN_ROLES } from '@/lib/navigation';
 import { getErrorMessage } from '@/lib/utils';
 import {
   Eye, EyeOff, Loader2, ChevronDown, AlertCircle, Lock, ShieldCheck,
-  Phone, Mail, User as UserIcon, MapPin, RefreshCw, CheckCircle2, ArrowLeft,
+  Phone, Mail, User as UserIcon, MapPin, CheckCircle2,
 } from 'lucide-react';
-
-const CODE_LENGTH = 6;
-
-function formatClock(total: number): string {
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
+import OtpPanel from '@/components/auth/OtpPanel';
+import {
+  sendOtp,
+  verifyOtp,
+  allowedChannelsForRole,
+  OtpError,
+  type OtpChannel,
+  type OtpChannelOption,
+} from '@/lib/otp';
 
 type Step = 'form' | 'otp' | 'done';
 
@@ -37,82 +38,52 @@ export default function RegisterPage() {
   const [openRegistration, setOpenRegistration] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [resending, setResending] = useState(false);
 
   // OTP state
-  const [newUserId, setNewUserId] = useState<string | null>(null);
-  const [devOtp, setDevOtp] = useState<string | null>(null);
-  const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(''));
-  const [secondsLeft, setSecondsLeft] = useState(600);
+  const [channels, setChannels] = useState<OtpChannelOption[]>([]);
+  const [selectedChannel, setSelectedChannel] = useState<OtpChannel>('sms');
+  const [destinationMasked, setDestinationMasked] = useState('');
+  const [expiresIn, setExpiresIn] = useState(300);
   const [resendIn, setResendIn] = useState(60);
-  const [otpError, setOtpError] = useState('');
-  const inputs = useRef<(HTMLInputElement | null)[]>([]);
+  const [resetSignal, setResetSignal] = useState(0);
+  const [otpInfo, setOtpInfo] = useState('');
 
   useEffect(() => {
-    supabase.from('barangays').select('*').order('name').then(({ data, error }) => {
-      if (error) { setError(getErrorMessage(error, 'Failed to load barangays')); return; }
+    supabase.from('barangays').select('*').order('name').then(({ data, error: err }) => {
+      if (err) { setError(getErrorMessage(err, 'Failed to load barangays')); return; }
       if (data) setBarangays(data);
     });
   }, []);
 
   useEffect(() => {
-    supabase.rpc('is_open_registration_enabled').then(({ data, error }) => {
-      if (error) { return; }
+    supabase.rpc('is_open_registration_enabled').then(({ data, error: err }) => {
+      if (err) return;
       setOpenRegistration(data === true);
     });
   }, []);
-
-  useEffect(() => {
-    if (step === 'otp') {
-      setDigits(Array(CODE_LENGTH).fill(''));
-      setOtpError('');
-      setSecondsLeft(600);
-      setResendIn(60);
-      setTimeout(() => inputs.current[0]?.focus(), 50);
-    }
-  }, [step]);
-
-  useEffect(() => {
-    if (step !== 'otp') return;
-    const t = setInterval(() => {
-      setSecondsLeft((s) => (s > 0 ? s - 1 : 0));
-      setResendIn((s) => (s > 0 ? s - 1 : 0));
-    }, 1000);
-    return () => clearInterval(t);
-  }, [step]);
 
   const set = (field: string) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
-  const setDigitAt = useCallback((index: number, value: string) => {
-    setDigits((prev) => { const n = [...prev]; n[index] = value; return n; });
-  }, []);
-
-  const handleOtpChange = (index: number, raw: string) => {
-    const val = raw.replace(/\D/g, '');
-    if (!val) { setDigitAt(index, ''); return; }
-    if (val.length > 1) {
-      const chars = val.slice(0, CODE_LENGTH - index).split('');
-      setDigits((prev) => {
-        const n = [...prev];
-        chars.forEach((c, i) => { n[index + i] = c; });
-        return n;
-      });
-      inputs.current[Math.min(index + chars.length, CODE_LENGTH - 1)]?.focus();
-      return;
-    }
-    setDigitAt(index, val);
-    if (index < CODE_LENGTH - 1) inputs.current[index + 1]?.focus();
+  const sendCode = async (channel: OtpChannel) => {
+    const result = await sendOtp({ purpose: 'verification', channel });
+    setDestinationMasked(result.destination_masked);
+    setExpiresIn(result.expires_in);
+    setResendIn(result.resend_in);
+    setResetSignal((n) => n + 1);
+    setOtpInfo(
+      result.delivered
+        ? `A new code was sent by ${channel === 'email' ? 'email' : 'SMS'}.`
+        : `No ${channel === 'email' ? 'email' : 'SMS'} provider is configured, so delivery is unavailable.`,
+    );
   };
 
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !digits[index] && index > 0) inputs.current[index - 1]?.focus();
-    if (e.key === 'ArrowLeft' && index > 0) inputs.current[index - 1]?.focus();
-    if (e.key === 'ArrowRight' && index < CODE_LENGTH - 1) inputs.current[index + 1]?.focus();
-  };
-
-  // --- Create account + send OTP ---
+  // --- Create account, then send the verification code ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -122,7 +93,6 @@ export default function RegisterPage() {
     if (form.password.length < 6) { setError('Password must be at least 6 characters'); return; }
     if (form.password !== form.confirmPassword) { setError('Passwords do not match'); return; }
 
-    // Phone is required for residents (their login ID)
     if (form.role === 'user' && !form.phone.trim()) {
       setError('Phone number is required for residents. It will be your login ID.');
       return;
@@ -130,19 +100,13 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      // Create the auth user
       const { error: signUpError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
-        options: {
-          data: {
-            full_name: form.fullName.trim(),
-          },
-        },
+        options: { data: { full_name: form.fullName.trim() } },
       });
       if (signUpError) throw signUpError;
 
-      // Complete registration with role, phone, etc.
       const { error: completeError } = await supabase.rpc('public_complete_registration', {
         p_role: form.role,
         p_full_name: form.fullName.trim(),
@@ -154,23 +118,19 @@ export default function RegisterPage() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Account was created but no session was established.');
 
-      const userId = userData.user.id;
-      setNewUserId(userId);
-
-      // Generate OTP for verification
-      const { data: otpData, error: otpErr } = await supabase.rpc(
-        form.role === 'user' ? 'generate_login_otp' : 'generate_staff_login_otp',
-        { p_user_id: userId }
-      );
-      if (otpErr) { setError(otpErr.message); setLoading(false); return; }
-
-      const code = (otpData as { dev_otp?: string; error?: string }).dev_otp || null;
-      if (!code) { /* OTP was generated but dev_otp not exposed; go straight to done */
-        setStep('done');
-        return;
-      }
-
-      setDevOtp(code);
+      // The role decides the available methods: residents are SMS only.
+      const permitted = allowedChannelsForRole(form.role);
+      const options: OtpChannelOption[] = permitted.map((channel) => ({
+        channel,
+        destination_masked:
+          channel === 'email'
+            ? form.email.replace(/(.{2}).*(@.*)/, '$1***$2')
+            : form.phone.trim().slice(0, 4) + '****' + form.phone.trim().slice(-2),
+      }));
+      setChannels(options);
+      const chosen = permitted[0];
+      setSelectedChannel(chosen);
+      await sendCode(chosen);
       setStep('otp');
     } catch (err: unknown) {
       const msg = getErrorMessage(err, 'Registration failed');
@@ -180,53 +140,48 @@ export default function RegisterPage() {
     }
   };
 
-  // --- Verify OTP ---
-  const handleVerifyOtp = async () => {
-    const code = digits.join('');
-    if (code.length !== CODE_LENGTH) { setOtpError('Enter all 6 digits'); return; }
-    if (!newUserId) return;
-
-    setOtpError('');
-    setLoading(true);
+  const handleSelectChannel = async (channel: OtpChannel) => {
+    if (channel === selectedChannel || resending) return;
+    setError(''); setOtpInfo('');
+    setResending(true);
     try {
-      const fnName = form.role === 'user' ? 'verify_login_otp' : 'verify_staff_login_otp';
-      const { data, error } = await supabase.rpc(fnName, {
-        p_user_id: newUserId,
-        p_otp: code,
-      });
-      if (error) throw error;
-      const result = data as { ok?: boolean; error?: string };
-      if (result?.error) throw new Error(result.error);
-
-      setStep('done');
+      setSelectedChannel(channel);
+      await sendCode(channel);
     } catch (err: unknown) {
-      setOtpError(err instanceof Error ? err.message : 'Verification failed');
-      setDigits(Array(CODE_LENGTH).fill(''));
-      inputs.current[0]?.focus();
+      setError(err instanceof Error ? err.message : 'Could not send the code');
     } finally {
-      setLoading(false);
+      setResending(false);
     }
   };
 
-  // --- Resend OTP ---
   const handleResend = async () => {
-    if (resendIn > 0 || loading || !newUserId) return;
-    setLoading(true);
-    setOtpError('');
+    if (resendIn > 0 || resending) return;
+    setError(''); setOtpInfo('');
+    setResending(true);
     try {
-      const fnName = form.role === 'user' ? 'generate_login_otp' : 'generate_staff_login_otp';
-      const { data, error } = await supabase.rpc(fnName, { p_user_id: newUserId });
-      if (error) throw error;
-      const result = data as { dev_otp?: string };
-      if (result?.dev_otp) setDevOtp(result.dev_otp);
-      setDigits(Array(CODE_LENGTH).fill(''));
-      setSecondsLeft(600);
-      setResendIn(60);
-      inputs.current[0]?.focus();
+      await sendCode(selectedChannel);
     } catch (err: unknown) {
-      setOtpError(err instanceof Error ? err.message : 'Could not resend code');
+      setError(err instanceof Error ? err.message : 'Could not resend the code');
     } finally {
-      setLoading(false);
+      setResending(false);
+    }
+  };
+
+  const handleVerifyOtp = async (code: string) => {
+    setError(''); setOtpInfo('');
+    setVerifying(true);
+    try {
+      await verifyOtp({ purpose: 'verification', otp: code });
+      setStep('done');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Verification failed';
+      setError(
+        err instanceof OtpError && typeof err.attemptsLeft === 'number'
+          ? `${message} (${err.attemptsLeft} attempt${err.attemptsLeft === 1 ? '' : 's'} left)`
+          : message,
+      );
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -264,7 +219,6 @@ export default function RegisterPage() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Role selection */}
                 {openRegistration ? (
                   <div>
                     <label htmlFor="registerRole" className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1">
@@ -278,12 +232,12 @@ export default function RegisterPage() {
                     </div>
                     {isStaff && (
                       <p className="text-xs text-primary-700 bg-primary-50 border border-primary-200 rounded-lg px-2.5 py-2 mt-2">
-                        Your staff ID will be generated automatically (e.g., {staffPrefix}-XXXXXX). You will use this ID to log in.
+                        Your staff ID will be generated automatically (e.g., {staffPrefix}-XXXXXX). You will use this ID to log in, and verify by email or SMS.
                       </p>
                     )}
                     {!isStaff && (
                       <p className="text-xs text-warning-700 bg-warning-50 border border-warning-200 rounded-lg px-2.5 py-2 mt-2">
-                        As a resident, your phone number will be your login ID. Make sure it is correct.
+                        As a resident, your phone number will be your login ID and you will verify by SMS.
                       </p>
                     )}
                   </div>
@@ -365,67 +319,23 @@ export default function RegisterPage() {
           )}
 
           {step === 'otp' && (
-            <>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
-                  <ShieldCheck className="w-5 h-5 text-primary-600" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">Verify your account</h2>
-                  <p className="text-sm text-gray-500">Enter the 6-digit code</p>
-                </div>
-              </div>
-
-              <p className="text-sm text-gray-600 mb-1">
-                A verification code was sent to
-              </p>
-              <p className="text-sm font-semibold text-gray-900 mb-4">
-                {form.email.replace(/(.{2}).*(@.*)/, '$1***$2')}
-              </p>
-
-              {devOtp && (
-                <div className="mb-4 p-3 rounded-lg bg-warning-50 border border-warning-200 text-warning-800 text-sm">
-                  <p className="font-medium">Development mode</p>
-                  <p className="text-xs mt-0.5">Code: <span className="font-mono font-bold tracking-widest">{devOtp}</span></p>
-                </div>
-              )}
-
-              {otpError && (
-                <div className="mb-4 p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" /> <span>{otpError}</span>
-                </div>
-              )}
-
-              <div className="flex justify-between gap-2 mb-4">
-                {digits.map((digit, i) => (
-                  <input
-                    key={i}
-                    ref={(el) => { inputs.current[i] = el; }}
-                    value={digit}
-                    onChange={(e) => handleOtpChange(i, e.target.value)}
-                    onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={CODE_LENGTH}
-                    aria-label={`Digit ${i + 1}`}
-                    className="w-full h-12 text-center text-xl font-bold rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none"
-                  />
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
-                <span>{secondsLeft > 0 ? `Code expires in ${formatClock(secondsLeft)}` : 'Code expired'}</span>
-                <button type="button" onClick={handleResend} disabled={resendIn > 0 || loading} className="flex items-center gap-1 font-medium text-primary-600 hover:text-primary-700 disabled:text-gray-400 disabled:cursor-not-allowed">
-                  {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                  {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
-                </button>
-              </div>
-
-              <button type="button" onClick={handleVerifyOtp} disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 py-2.5">
-                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {loading ? 'Verifying...' : 'Verify & continue'}
-              </button>
-            </>
+            <OtpPanel
+              channels={channels}
+              selectedChannel={selectedChannel}
+              onSelectChannel={handleSelectChannel}
+              destinationMasked={destinationMasked}
+              expiresIn={expiresIn}
+              resendIn={resendIn}
+              resetSignal={resetSignal}
+              verifying={verifying}
+              resending={resending}
+              error={error}
+              info={otpInfo}
+              onVerify={handleVerifyOtp}
+              onResend={handleResend}
+              onBack={() => { setStep('form'); setError(''); setOtpInfo(''); }}
+              title="Verify your account"
+            />
           )}
 
           {step === 'done' && (
@@ -436,8 +346,8 @@ export default function RegisterPage() {
               <h2 className="text-lg font-bold text-gray-900 mb-2">Account verified</h2>
               <p className="text-sm text-gray-500 mb-6">
                 {isStaff
-                  ? `Your staff ID has been generated. You can now sign in using it.`
-                  : `Your account is ready. You can now sign in with your phone number.`}
+                  ? 'Your staff ID has been generated. You can now sign in using it.'
+                  : 'Your account is ready. You can now sign in with your phone number.'}
               </p>
               <button type="button" onClick={() => navigate('/login', { replace: true })} className="btn-primary w-full py-2.5">
                 Go to sign in
