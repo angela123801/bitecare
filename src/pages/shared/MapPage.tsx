@@ -1,11 +1,16 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { supabase } from '@/lib/supabase';
-import { BACOLOD_CENTER, DEFAULT_ZOOM, FACILITY_TYPE_LABELS } from '@/config/constants';
+import { BACOLOD_CENTER, DEFAULT_ZOOM, FACILITY_TYPE_LABELS, ANIMAL_TYPE_LABELS, REPORT_STATUS_LABELS } from '@/config/constants';
 import { formatDate, getErrorMessage } from '@/lib/utils';
-import type { HealthcareFacility, BiteReport } from '@/types';
+import { useMapReports, type MapFilters } from '@/lib/mapReports';
+import { buildHeatPoints } from '@/lib/heatmap';
+import HeatmapLayer from '@/components/map/HeatmapLayer';
+import HeatmapLegend from '@/components/map/HeatmapLegend';
+import MapFilterPanel from '@/components/map/MapFilterPanel';
+import type { HealthcareFacility } from '@/types';
 import { Loader2, LocateFixed, Layers, X } from 'lucide-react';
 
 // Fix default Leaflet icon issue
@@ -75,6 +80,7 @@ function LocateButton() {
     <button
       onClick={handleLocate}
       title="My location"
+      aria-label="My location"
       className="absolute top-4 right-4 z-[1000] bg-white rounded-lg p-2.5 shadow-lg hover:bg-gray-50 transition-colors"
     >
       {locating ? <Loader2 className="w-5 h-5 animate-spin text-primary-600" /> : <LocateFixed className="w-5 h-5 text-gray-700" />}
@@ -82,52 +88,54 @@ function LocateButton() {
   );
 }
 
+interface BarangayOption {
+  id: string;
+  name: string;
+}
+
 export default function MapPage() {
   const [facilities, setFacilities] = useState<HealthcareFacility[]>([]);
-  const [reports, setReports] = useState<BiteReport[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [barangays, setBarangays] = useState<BarangayOption[]>([]);
   const [showFacilities, setShowFacilities] = useState(true);
   const [showReports, setShowReports] = useState(true);
+  const [showHeatmap, setShowHeatmap] = useState(true);
   const [showLayers, setShowLayers] = useState(false);
+  const [filters, setFilters] = useState<MapFilters>({
+    dateFrom: '', dateTo: '', barangayId: '', animalType: '', status: '',
+  });
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [facRes, repRes] = await Promise.all([
-        supabase.from('healthcare_facilities').select('*').eq('is_active', true),
-        supabase.from('bite_reports').select('id, category, animal_type, incident_location, incident_latitude, incident_longitude, bite_date, status').not('incident_latitude', 'is', null).not('incident_longitude', 'is', null),
-      ]);
-      if (facRes.error) throw facRes.error;
-      if (repRes.error) throw repRes.error;
-      setFacilities((facRes.data as HealthcareFacility[]) || []);
-      setReports((repRes.data as BiteReport[]) || []);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Failed to load map data'));
-    } finally {
-      setLoading(false);
-    }
+  const { reports, loading: reportsLoading, error: reportsError } = useMapReports(filters);
+
+  const fetchReference = useCallback(async () => {
+    const [facRes, brgyRes] = await Promise.all([
+      supabase.from('healthcare_facilities').select('*').eq('is_active', true),
+      supabase.from('barangays').select('id, name').order('name'),
+    ]);
+    if (!facRes.error) setFacilities((facRes.data as HealthcareFacility[]) || []);
+    if (!brgyRes.error) setBarangays((brgyRes.data as BarangayOption[]) || []);
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchReference();
+  }, [fetchReference]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
-      </div>
-    );
-  }
+  // Intensity per report is derived from how tightly reports cluster, so a
+  // dense barangay burns hotter than an isolated case. Recomputed only when
+  // the report set actually changes.
+  const heatPoints = useMemo(
+    () =>
+      buildHeatPoints(
+        reports
+          .filter((r) => r.incident_latitude != null && r.incident_longitude != null)
+          .map((r) => ({ lat: r.incident_latitude, lng: r.incident_longitude })),
+      ),
+    [reports],
+  );
 
-  if (error) {
-    return (
-      <div className="text-center py-20">
-        <p className="text-danger-600">{error}</p>
-      </div>
-    );
-  }
+  const visibleReports = useMemo(
+    () => reports.filter((r) => r.incident_latitude != null && r.incident_longitude != null),
+    [reports],
+  );
 
   return (
     <div className="relative h-[calc(100vh-4rem)]">
@@ -142,6 +150,8 @@ export default function MapPage() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <LocateButton />
+
+        <HeatmapLayer points={heatPoints} visible={showHeatmap && !reportsLoading} />
 
         {showFacilities &&
           facilities.filter((f) => f.latitude != null && f.longitude != null).map((f) => (
@@ -159,35 +169,50 @@ export default function MapPage() {
           ))}
 
         {showReports &&
-          reports.map((r) =>
-            r.incident_latitude != null && r.incident_longitude != null ? (
-              <Marker key={r.id} position={[r.incident_latitude, r.incident_longitude]} icon={getBiteIcon()}>
-                <Popup>
-                  <div className="min-w-[180px]">
-                    <h3 className="font-semibold text-sm">Bite Report</h3>
-                    <p className="text-xs text-gray-500">Category {r.category} • {r.animal_type}</p>
-                    <p className="text-xs mt-1">{r.incident_location}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{formatDate(r.bite_date)}</p>
-                    <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{r.status}</span>
-                  </div>
-                </Popup>
-              </Marker>
-            ) : null
-          )}
+          visibleReports.map((r) => (
+            <Marker key={r.id} position={[r.incident_latitude, r.incident_longitude]} icon={getBiteIcon()}>
+              <Popup>
+                <div className="min-w-[180px]">
+                  <h3 className="font-semibold text-sm">Bite Report</h3>
+                  <p className="text-xs text-gray-500">
+                    Category {r.category} • {ANIMAL_TYPE_LABELS[r.animal_type] ?? r.animal_type}
+                  </p>
+                  <p className="text-xs mt-1">{r.incident_location}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{formatDate(r.bite_date)}</p>
+                  <span className="inline-block mt-1 text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                    {REPORT_STATUS_LABELS[r.status] ?? r.status}
+                  </span>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
       </MapContainer>
 
+      {/* Filters */}
+      <MapFilterPanel
+        filters={filters}
+        onChange={setFilters}
+        barangays={barangays}
+        resultCount={visibleReports.length}
+      />
+
       {/* Layer Toggle */}
-      <div className="absolute top-4 left-4 z-[1000]">
+      <div className="absolute top-4 left-16 z-[1000]">
         <button
           onClick={() => setShowLayers(!showLayers)}
+          aria-label="Layers"
           className="bg-white rounded-lg p-2.5 shadow-lg hover:bg-gray-50 transition-colors"
         >
           {showLayers ? <X className="w-5 h-5 text-gray-700" /> : <Layers className="w-5 h-5 text-gray-700" />}
         </button>
 
         {showLayers && (
-          <div className="mt-2 bg-white rounded-lg shadow-lg p-3 min-w-[180px]">
+          <div className="mt-2 bg-white rounded-lg shadow-lg p-3 min-w-[190px]">
             <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Layers</p>
+            <label className="flex items-center gap-2 cursor-pointer py-1">
+              <input type="checkbox" checked={showHeatmap} onChange={() => setShowHeatmap(!showHeatmap)} className="rounded text-primary-600" />
+              <span className="text-sm text-gray-700">Incident Heatmap</span>
+            </label>
             <label className="flex items-center gap-2 cursor-pointer py-1">
               <input type="checkbox" checked={showFacilities} onChange={() => setShowFacilities(!showFacilities)} className="rounded text-primary-600" />
               <span className="text-sm text-gray-700">Facilities</span>
@@ -200,22 +225,39 @@ export default function MapPage() {
         )}
       </div>
 
+      {/* Status / error banner */}
+      {reportsError && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-danger-50 border border-danger-200 text-danger-700 text-sm rounded-lg px-3 py-2 shadow-lg">
+          {reportsError}
+        </div>
+      )}
+
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 z-[1000] bg-white/95 backdrop-blur rounded-lg shadow-lg p-3">
-        <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Legend</p>
-        <div className="space-y-1.5">
-          {Object.entries(FACILITY_COLORS).map(([type, color]) => (
-            <div key={type} className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: color }} />
-              <span className="text-xs text-gray-700">{FACILITY_TYPE_LABELS[type] || type}</span>
+      <div className="absolute bottom-4 left-4 z-[1000] flex flex-col gap-2 max-h-[calc(100%-7rem)] overflow-y-auto">
+        {showHeatmap && <HeatmapLegend />}
+        <div className="bg-white/95 backdrop-blur rounded-lg shadow-lg p-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Facilities</p>
+          <div className="space-y-1.5">
+            {Object.entries(FACILITY_COLORS).map(([type, color]) => (
+              <div key={type} className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: color }} />
+                <span className="text-xs text-gray-700">{FACILITY_TYPE_LABELS[type] || type}</span>
+              </div>
+            ))}
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full flex-shrink-0 bg-red-500" />
+              <span className="text-xs text-gray-700">🐾 Bite Report</span>
             </div>
-          ))}
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full flex-shrink-0 bg-red-500" />
-            <span className="text-xs text-gray-700">🐾 Bite Report</span>
           </div>
         </div>
       </div>
+
+      {reportsLoading && (
+        <div className="absolute bottom-4 right-4 z-[1000] bg-white rounded-lg shadow-lg px-3 py-2 flex items-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin text-primary-600" />
+          <span className="text-xs text-gray-600">Loading reports…</span>
+        </div>
+      )}
     </div>
   );
 }
