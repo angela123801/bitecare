@@ -19,6 +19,7 @@ function json(data: unknown, status = 200) {
   });
 }
 
+/** A random, unguessable starting password. It is never returned or stored in plain text. */
 function randomPassword() {
   const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);
@@ -95,7 +96,9 @@ Deno.serve(async (req: Request) => {
         return json({ error: 'Full name, email and role are required' }, 400);
       }
 
-      // Authorise + validate the role via the database (server-side, not UI).
+      // Authorise + validate the role and record the audit trail. This runs as
+      // the signed-in caller, so the database's own role matrix is the source
+      // of truth (not the UI).
       const { error: authErr } = await callerClient.rpc('admin_create_account', {
         p_email: email,
         p_full_name: fullName,
@@ -127,7 +130,16 @@ Deno.serve(async (req: Request) => {
           verification_status: requireVerification ? 'pending_verification' : 'verified',
         })
         .eq('id', newUserId);
-      if (updateErr) return json({ error: updateErr.message }, 500);
+      if (updateErr) {
+        // Do not leave a half-created account behind: the profile could not be
+        // given its role, so remove the auth user and report the failure.
+        try {
+          await adminClient.auth.admin.deleteUser(newUserId);
+        } catch {
+          // Best effort cleanup; the error below is what matters.
+        }
+        return json({ error: updateErr.message }, 500);
+      }
 
       // Keep the sign-in token's role claim in step with the profile, so the
       // new account's first session carries the correct role immediately.
@@ -137,16 +149,22 @@ Deno.serve(async (req: Request) => {
       });
       if (metaErr) return json({ error: metaErr.message }, 500);
 
-      let code: string | null = null;
-      let emailSent = false;
+      // Read back the generated Staff ID so the creator can share it.
+      const { data: newProfile } = await adminClient
+        .from('profiles')
+        .select('staff_id')
+        .eq('id', newUserId)
+        .maybeSingle();
+
+      let otpSent = false;
 
       if (requireVerification) {
         const { data: otpData, error: otpErr } = await adminClient.rpc('generate_verification_otp', {
           p_user_id: newUserId,
         });
         if (otpErr) return json({ error: otpErr.message }, 500);
-        code = (otpData as { otp: string }).otp;
-        emailSent = await sendOtpEmail(email, code);
+        const code = (otpData as { otp: string }).otp;
+        otpSent = await sendOtpEmail(email, code);
       } else {
         await adminClient.rpc('mark_account_verified', { p_user_id: newUserId });
       }
@@ -156,19 +174,26 @@ Deno.serve(async (req: Request) => {
         action: 'account_created',
         entity_type: 'account',
         entity_id: newUserId,
-        new_values: { email, role, full_name: fullName, verification_required: !!requireVerification },
+        new_values: {
+          email,
+          role,
+          full_name: fullName,
+          staff_id: newProfile?.staff_id ?? null,
+          verification_required: !!requireVerification,
+          otp_sent: otpSent,
+        },
       });
 
-      // When no email provider is configured we surface the code to the
-      // authorised creator only, clearly flagged as development mode.
+      // The verification code is NEVER returned to the client. When the email
+      // could not be sent we say so plainly instead of pretending it was.
       return json({
         ok: true,
         user_id: newUserId,
         email,
         role,
+        staff_id: newProfile?.staff_id ?? null,
         requires_verification: !!requireVerification,
-        email_sent: emailSent,
-        dev_otp: !emailSent && requireVerification ? code : undefined,
+        otp_sent: otpSent,
       });
     }
 
@@ -193,9 +218,9 @@ Deno.serve(async (req: Request) => {
       if (otpErr) return json({ error: otpErr.message }, 400);
 
       const code = (otpData as { otp: string }).otp;
-      const emailSent = await sendOtpEmail(target.email, code);
+      const otpSent = await sendOtpEmail(target.email, code);
 
-      return json({ ok: true, email_sent: emailSent, dev_otp: emailSent ? undefined : code });
+      return json({ ok: true, otp_sent: otpSent });
     }
 
     // ---------- Verify code ----------

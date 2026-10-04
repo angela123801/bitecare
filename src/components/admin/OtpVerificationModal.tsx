@@ -6,7 +6,7 @@ interface Props {
   open: boolean;
   userId: string | null;
   email: string;
-  devOtp?: string | null;
+  deliveryFailed?: boolean;
   onClose: () => void;
   onVerified: () => void;
 }
@@ -28,7 +28,7 @@ function formatClock(total: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export default function OtpVerificationModal({ open, userId, email, devOtp, onClose, onVerified }: Props) {
+export default function OtpVerificationModal({ open, userId, email, deliveryFailed, onClose, onVerified }: Props) {
   const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(''));
   const [error, setError] = useState('');
   const [verifying, setVerifying] = useState(false);
@@ -37,7 +37,6 @@ export default function OtpVerificationModal({ open, userId, email, devOtp, onCl
   const [secondsLeft, setSecondsLeft] = useState(OTP_TTL_SECONDS);
   const [resendIn, setResendIn] = useState(RESEND_COOLDOWN_SECONDS);
   const [resending, setResending] = useState(false);
-  const [devCode, setDevCode] = useState<string | null>(null);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
@@ -49,9 +48,8 @@ export default function OtpVerificationModal({ open, userId, email, devOtp, onCl
     setVerifying(false);
     setSecondsLeft(OTP_TTL_SECONDS);
     setResendIn(RESEND_COOLDOWN_SECONDS);
-    setDevCode(devOtp ?? null);
     setTimeout(() => inputs.current[0]?.focus(), 50);
-  }, [open, userId, devOtp]);
+  }, [open, userId]);
 
   useEffect(() => {
     if (!open || success) return;
@@ -132,8 +130,11 @@ export default function OtpVerificationModal({ open, userId, email, devOtp, onCl
       setDigits(Array(CODE_LENGTH).fill(''));
       setSecondsLeft(OTP_TTL_SECONDS);
       setResendIn(RESEND_COOLDOWN_SECONDS);
-      setDevCode(result.dev_otp ?? null);
-      setInfo(result.email_sent ? 'A new code has been emailed.' : 'A new code has been generated.');
+      if (result.otp_sent) {
+        setInfo('A new code has been emailed.');
+      } else {
+        setError('The email could not be sent. Check that the email service is configured, then try again.');
+      }
       inputs.current[0]?.focus();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not resend the code');
@@ -188,11 +189,12 @@ export default function OtpVerificationModal({ open, userId, email, devOtp, onCl
             </p>
             <p className="text-sm font-semibold text-gray-900 mb-4">{maskEmail(email)}</p>
 
-            {devCode && (
+            {deliveryFailed && !info && (
               <div className="mb-4 p-3 rounded-lg bg-warning-50 border border-warning-200 text-warning-800 text-sm">
-                <p className="font-medium">Development mode</p>
+                <p className="font-medium">The verification email could not be sent</p>
                 <p className="text-xs mt-0.5">
-                  No email provider is configured, so the code is shown here: <span className="font-mono font-bold tracking-widest">{devCode}</span>
+                  The email service is not configured. Set it up, then use Resend code below. The
+                  account exists but stays locked until the code is confirmed.
                 </p>
               </div>
             )}

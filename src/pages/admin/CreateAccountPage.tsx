@@ -97,9 +97,35 @@ export default function CreateAccountPage() {
                 <CheckCircle2 className="w-6 h-6 text-success-600" />
               </div>
               <h2 className="text-lg font-bold text-gray-900 mb-1">Account created</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                {result!.email} was created as {ROLE_LABELS[result!.role]}.
+              </p>
+
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-left mb-4">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  {result!.staff_id ? 'Staff ID (login ID)' : 'Login ID'}
+                </p>
+                <p className="mt-1 font-mono text-lg font-bold text-gray-900 tracking-wider">
+                  {result!.staff_id ?? form.phone ?? result!.email}
+                </p>
+                <p className="mt-2 text-xs text-gray-500">
+                  {result!.staff_id
+                    ? 'Share this Staff ID with the account holder. They sign in with it and set their own password via Forgot password.'
+                    : 'This resident signs in with their mobile number and sets their own password via Forgot password.'}
+                </p>
+              </div>
+
+              {result!.requires_verification && !result!.otp_sent && (
+                <div className="mb-4 p-3 rounded-lg bg-warning-50 border border-warning-200 text-warning-800 text-sm text-left">
+                  The verification email could not be sent because the email service is not configured.
+                  The account exists but stays locked until the code is confirmed.
+                </div>
+              )}
+
               <p className="text-sm text-gray-500 mb-6">
-                {result!.email} was created as {ROLE_LABELS[result!.role]}
-                {result!.requires_verification ? ' and is verified.' : ' and is ready to sign in.'}
+                {result!.requires_verification
+                  ? (result!.otp_sent ? 'A verification code has been emailed to the account holder.' : 'Verification is still pending.')
+                  : 'The account is ready to sign in.'}
               </p>
               <div className="flex gap-3 justify-center">
                 {profile?.role !== 'health_worker' && (
@@ -240,7 +266,7 @@ export default function CreateAccountPage() {
         open={showOtp}
         userId={result?.user_id ?? null}
         email={result?.email ?? ''}
-        devOtp={result?.dev_otp ?? null}
+        deliveryFailed={Boolean(result?.requires_verification && !result?.otp_sent)}
         onClose={() => setShowOtp(false)}
         onVerified={() => { /* success state handled by modal */ }}
       />

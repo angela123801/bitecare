@@ -27,15 +27,14 @@ export interface CreateAccountResult {
   user_id: string;
   email: string;
   role: UserRole;
+  staff_id: string | null;
   requires_verification: boolean;
-  email_sent: boolean;
-  dev_otp?: string;
+  otp_sent: boolean;
 }
 
 export interface ResendResult {
   ok: true;
-  email_sent: boolean;
-  dev_otp?: string;
+  otp_sent: boolean;
 }
 
 async function invoke<T>(body: Record<string, unknown>): Promise<T> {
