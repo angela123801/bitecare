@@ -167,8 +167,8 @@ export default function OtpVerificationModal({ open, userId, email, deliveryFail
             </div>
             <h2 id="otp-title" className="text-lg font-bold text-gray-900 mb-2">Account verified</h2>
             <p className="text-sm text-gray-500 mb-6">
-              {email} is now verified and can sign in. Share their sign-in email and ask them to use
-              &ldquo;Forgot password&rdquo; to set their own password.
+              {email} is now verified and can sign in with the Staff ID (or mobile number) and the
+              password you set.
             </p>
             <button type="button" onClick={onClose} className="btn-primary w-full py-2.5">Done</button>
           </div>

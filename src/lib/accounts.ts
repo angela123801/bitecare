@@ -65,6 +65,7 @@ export function createAccount(input: {
   fullName: string;
   phone: string;
   role: UserRole;
+  password: string;
   requireVerification: boolean;
 }): Promise<CreateAccountResult> {
   return invoke<CreateAccountResult>({ action: 'create', ...input });

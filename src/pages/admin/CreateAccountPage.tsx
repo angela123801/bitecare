@@ -7,6 +7,7 @@ import type { UserRole } from '@/types';
 import OtpVerificationModal from '@/components/admin/OtpVerificationModal';
 import {
   UserPlus, Loader2, AlertCircle, CheckCircle2, ShieldCheck, Mail, Phone, User as UserIcon, ShieldAlert,
+  Lock, Eye, EyeOff,
 } from 'lucide-react';
 
 export default function CreateAccountPage() {
@@ -24,6 +25,9 @@ export default function CreateAccountPage() {
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<CreateAccountResult | null>(null);
   const [showOtp, setShowOtp] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const set = (field: keyof typeof form) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -41,6 +45,12 @@ export default function CreateAccountPage() {
     if (!form.fullName.trim()) { setError('Full name is required.'); return; }
     if (!form.email.trim() || !form.email.includes('@')) { setError('A valid email address is required.'); return; }
     if (!allowedRoles.includes(form.role)) { setError('You are not allowed to create that role.'); return; }
+    if (form.role === 'user' && !/^0\d{10}$/.test(form.phone.replace(/[^0-9]/g, '').replace(/^63/, '0'))) {
+      setError('A resident needs a valid mobile number (for example 09171234567) because it is their login ID.');
+      return;
+    }
+    if (password.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    if (password !== confirmPassword) { setError('The two passwords do not match.'); return; }
 
     setSaving(true);
     try {
@@ -49,6 +59,7 @@ export default function CreateAccountPage() {
         fullName: form.fullName.trim(),
         phone: form.phone.trim(),
         role: form.role,
+        password,
         requireVerification: form.requireVerification,
       });
       setResult(created);
@@ -65,6 +76,9 @@ export default function CreateAccountPage() {
   const resetForm = () => {
     setResult(null);
     setShowOtp(false);
+    setPassword('');
+    setConfirmPassword('');
+    setShowPassword(false);
     setForm((f) => ({ ...f, fullName: '', email: '', phone: '' }));
   };
 
@@ -110,8 +124,8 @@ export default function CreateAccountPage() {
                 </p>
                 <p className="mt-2 text-xs text-gray-500">
                   {result!.staff_id
-                    ? 'Share this Staff ID with the account holder. They sign in with it and set their own password via Forgot password.'
-                    : 'This resident signs in with their mobile number and sets their own password via Forgot password.'}
+                    ? 'Share this Staff ID and the password you set with the account holder. They sign in with both.'
+                    : 'This resident signs in with their mobile number and the password you set.'}
                 </p>
               </div>
 
@@ -182,7 +196,10 @@ export default function CreateAccountPage() {
                 </div>
                 <div>
                   <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                    Contact number <span className="text-gray-400 font-normal">(optional)</span>
+                    Contact number{' '}
+                    <span className="text-gray-400 font-normal">
+                      {form.role === 'user' ? '(required for residents)' : '(optional)'}
+                    </span>
                   </label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -193,6 +210,7 @@ export default function CreateAccountPage() {
                       onChange={set('phone')}
                       className="input-field pl-9"
                       placeholder="09XX XXX XXXX"
+                      required={form.role === 'user'}
                     />
                   </div>
                 </div>
@@ -228,7 +246,65 @@ export default function CreateAccountPage() {
                 <p className="text-xs text-gray-400 mt-2">
                   You can only assign roles available to you. This is enforced by the system, not just this page.
                 </p>
+                <p className="text-xs text-primary-700 mt-1">
+                  {form.role === 'user'
+                    ? 'The resident signs in with their mobile number.'
+                    : 'A unique Staff ID is generated automatically and shown after you create the account.'}
+                </p>
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="input-field pl-9 pr-10"
+                      placeholder="At least 8 characters"
+                      required
+                      minLength={8}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                    Confirm password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      id="confirmPassword"
+                      type={showPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="input-field pl-9"
+                      placeholder="Re-enter the password"
+                      required
+                      minLength={8}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 -mt-3">
+                The account holder signs in with this password. It is stored securely by the sign-in
+                service and is never kept in plain text.
+              </p>
 
               <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer">
                 <input

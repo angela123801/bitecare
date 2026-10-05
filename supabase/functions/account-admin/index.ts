@@ -19,13 +19,6 @@ function json(data: unknown, status = 200) {
   });
 }
 
-/** A random, unguessable starting password. It is never returned or stored in plain text. */
-function randomPassword() {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 async function sendOtpEmail(email: string, code: string): Promise<boolean> {
   if (!RESEND_API_KEY) return false;
   try {
@@ -88,12 +81,15 @@ Deno.serve(async (req: Request) => {
 
     // ---------- Create an account ----------
     if (action === 'create') {
-      const { email, fullName, role, phone, requireVerification } = body as {
-        email: string; fullName: string; role: string; phone?: string; requireVerification?: boolean;
+      const { email, fullName, role, phone, password, requireVerification } = body as {
+        email: string; fullName: string; role: string; phone?: string; password?: string; requireVerification?: boolean;
       };
 
       if (!email || !fullName || !role) {
         return json({ error: 'Full name, email and role are required' }, 400);
+      }
+      if (!password || password.length < 8) {
+        return json({ error: 'A password of at least 8 characters is required' }, 400);
       }
 
       // Authorise + validate the role and record the audit trail. This runs as
@@ -109,7 +105,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: created, error: createErr } = await adminClient.auth.admin.createUser({
         email,
-        password: randomPassword(),
+        password,
         email_confirm: true,
         user_metadata: { full_name: fullName },
       });
