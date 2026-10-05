@@ -13,6 +13,9 @@ import {
 export default function CreateAccountPage() {
   const { profile } = useAuth();
   const allowedRoles = rolesForCreator(profile?.role);
+  // Presentation only. The server independently derives the caller's role from
+  // their session, so this flag cannot grant anything by itself.
+  const isSuperAdmin = profile?.role === 'super_admin';
 
   const [form, setForm] = useState({
     fullName: '',
@@ -60,7 +63,7 @@ export default function CreateAccountPage() {
         phone: form.phone.trim(),
         role: form.role,
         password,
-        requireVerification: form.requireVerification,
+        requireVerification: isSuperAdmin ? false : form.requireVerification,
       });
       setResult(created);
       if (created.requires_verification) {
@@ -89,7 +92,9 @@ export default function CreateAccountPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Create Account</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Add a new account. A verification code is required before the account can be used.
+          {isSuperAdmin
+            ? 'Accounts you create are activated immediately, with no verification code. You set the password and the system generates the login ID.'
+            : 'Add a new account. A verification code is required before the account can be used.'}
         </p>
       </div>
 
@@ -117,15 +122,15 @@ export default function CreateAccountPage() {
 
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-left mb-4">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  {result!.staff_id ? 'Staff ID (login ID)' : 'Login ID'}
+                  {result!.role === 'user' ? 'Login ID (mobile number)' : 'Staff ID (login ID)'}
                 </p>
                 <p className="mt-1 font-mono text-lg font-bold text-gray-900 tracking-wider">
-                  {result!.staff_id ?? form.phone ?? result!.email}
+                  {result!.login_id || result!.staff_id || form.phone || result!.email}
                 </p>
                 <p className="mt-2 text-xs text-gray-500">
-                  {result!.staff_id
-                    ? 'Share this Staff ID and the password you set with the account holder. They sign in with both.'
-                    : 'This resident signs in with their mobile number and the password you set.'}
+                  {result!.role === 'user'
+                    ? 'This resident signs in with this mobile number and the password you set.'
+                    : 'Share this Staff ID and the password you set with the account holder. They sign in with both.'}
                 </p>
               </div>
 
@@ -137,9 +142,11 @@ export default function CreateAccountPage() {
               )}
 
               <p className="text-sm text-gray-500 mb-6">
-                {result!.requires_verification
-                  ? (result!.otp_sent ? 'A verification code has been emailed to the account holder.' : 'Verification is still pending.')
-                  : 'The account is ready to sign in.'}
+                {result!.provisioning_mode === 'super_admin_exempt'
+                  ? 'The account is active now. No verification code was required.'
+                  : result!.requires_verification
+                    ? (result!.otp_sent ? 'A verification code has been emailed to the account holder.' : 'Verification is still pending.')
+                    : 'The account is ready to sign in.'}
               </p>
               <div className="flex gap-3 justify-center">
                 {profile?.role !== 'health_worker' && (
@@ -306,24 +313,39 @@ export default function CreateAccountPage() {
                 service and is never kept in plain text.
               </p>
 
-              <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.requireVerification}
-                  onChange={set('requireVerification')}
-                  className="mt-0.5 accent-teal-600"
-                />
-                <span>
-                  <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
-                    <ShieldCheck className="w-4 h-4 text-primary-600" />
-                    Require verification code
+              {isSuperAdmin ? (
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-primary-200 bg-primary-50">
+                  <ShieldCheck className="w-4 h-4 text-primary-600 mt-0.5 flex-shrink-0" />
+                  <span>
+                    <span className="block text-sm font-semibold text-primary-900">
+                      Immediate activation (Super Admin)
+                    </span>
+                    <span className="block text-xs text-primary-800">
+                      No verification code is generated or sent, by email or text. The account can sign
+                      in as soon as you create it.
+                    </span>
                   </span>
-                  <span className="block text-xs text-gray-500">
-                    Send a one-time code to the person&apos;s email. The account stays locked until the
-                    correct code is entered.
+                </div>
+              ) : (
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.requireVerification}
+                    onChange={set('requireVerification')}
+                    className="mt-0.5 accent-teal-600"
+                  />
+                  <span>
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
+                      <ShieldCheck className="w-4 h-4 text-primary-600" />
+                      Require verification code
+                    </span>
+                    <span className="block text-xs text-gray-500">
+                      Send a one-time code to the person&apos;s email. The account stays locked until the
+                      correct code is entered.
+                    </span>
                   </span>
-                </span>
-              </label>
+                </label>
+              )}
 
               <button
                 type="submit"

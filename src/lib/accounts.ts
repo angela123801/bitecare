@@ -28,7 +28,10 @@ export interface CreateAccountResult {
   email: string;
   role: UserRole;
   staff_id: string | null;
+  /** Staff ID for staff, mobile number for residents. */
+  login_id: string | null;
   requires_verification: boolean;
+  provisioning_mode: 'super_admin_exempt' | 'standard';
   otp_sent: boolean;
 }
 

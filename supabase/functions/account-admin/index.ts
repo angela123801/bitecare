@@ -72,6 +72,12 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Your role cannot create accounts' }, 403);
     }
 
+    // Authoritative, server-side determination of the Super Admin exemption.
+    // `callerProfile.role` is read from the database for the signed-in user's
+    // verified session, so it cannot be influenced by anything in the request
+    // body. A resident or admin cannot claim this by editing the UI or payload.
+    const isSuperAdmin = callerRole === 'super_admin';
+
     const adminClient = createClient(SUPABASE_URL, SERVICE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -91,6 +97,11 @@ Deno.serve(async (req: Request) => {
       if (!password || password.length < 8) {
         return json({ error: 'A password of at least 8 characters is required' }, 400);
       }
+
+      // Super Admin provisioning exemption: accounts created by a Super Admin are
+      // activated immediately. No code is generated or sent, and the account is
+      // never held back waiting on email or SMS verification.
+      const verificationRequired = isSuperAdmin ? false : !!requireVerification;
 
       // Authorise + validate the role and record the audit trail. This runs as
       // the signed-in caller, so the database's own role matrix is the source
@@ -123,7 +134,7 @@ Deno.serve(async (req: Request) => {
           role,
           full_name: fullName,
           phone: phone ?? '',
-          verification_status: requireVerification ? 'pending_verification' : 'verified',
+          verification_status: verificationRequired ? 'pending_verification' : 'verified',
         })
         .eq('id', newUserId);
       if (updateErr) {
@@ -154,7 +165,7 @@ Deno.serve(async (req: Request) => {
 
       let otpSent = false;
 
-      if (requireVerification) {
+      if (verificationRequired) {
         const { data: otpData, error: otpErr } = await adminClient.rpc('generate_verification_otp', {
           p_user_id: newUserId,
         });
@@ -162,8 +173,13 @@ Deno.serve(async (req: Request) => {
         const code = (otpData as { otp: string }).otp;
         otpSent = await sendOtpEmail(email, code);
       } else {
+        // No verification step at all: activate the account now.
         await adminClient.rpc('mark_account_verified', { p_user_id: newUserId });
       }
+
+      // Staff sign in with the generated Staff ID; residents sign in with the
+      // mobile number they registered.
+      const loginId = role === 'user' ? (phone ?? '') : (newProfile?.staff_id ?? null);
 
       await adminClient.from('audit_logs').insert({
         actor_id: user.id,
@@ -175,7 +191,9 @@ Deno.serve(async (req: Request) => {
           role,
           full_name: fullName,
           staff_id: newProfile?.staff_id ?? null,
-          verification_required: !!requireVerification,
+          login_id: loginId,
+          verification_required: verificationRequired,
+          provisioning_mode: isSuperAdmin ? 'super_admin_exempt' : 'standard',
           otp_sent: otpSent,
         },
       });
@@ -188,7 +206,9 @@ Deno.serve(async (req: Request) => {
         email,
         role,
         staff_id: newProfile?.staff_id ?? null,
-        requires_verification: !!requireVerification,
+        login_id: loginId,
+        requires_verification: verificationRequired,
+        provisioning_mode: isSuperAdmin ? 'super_admin_exempt' : 'standard',
         otp_sent: otpSent,
       });
     }
