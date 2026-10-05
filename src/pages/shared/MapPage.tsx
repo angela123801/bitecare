@@ -4,7 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { supabase } from '@/lib/supabase';
 import { BACOLOD_CENTER, DEFAULT_ZOOM, FACILITY_TYPE_LABELS, ANIMAL_TYPE_LABELS, REPORT_STATUS_LABELS } from '@/config/constants';
-import { formatDate, getErrorMessage } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import { useMapReports, EMPTY_FILTERS, type MapFilters } from '@/lib/mapReports';
 import { buildHeatPoints } from '@/lib/heatmap';
 import HeatmapLayer from '@/components/map/HeatmapLayer';

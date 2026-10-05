@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { Eye, EyeOff, Loader2, CheckCircle, AlertCircle, KeyRound, Phone, IdCard, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Loader2, CheckCircle, AlertCircle, KeyRound, Phone } from 'lucide-react';
 import OtpPanel from '@/components/auth/OtpPanel';
 import {
   fetchOtpChannels,

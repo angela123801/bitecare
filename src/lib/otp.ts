@@ -50,11 +50,8 @@ export const CHANNEL_LABELS: Record<OtpChannel, string> = {
   sms: 'SMS',
 };
 
-/**
- * Which verification methods an account may use. SMS is the only supported
- * method, for every role; the server enforces the same rule independently.
- */
-export function allowedChannelsForRole(_role?: UserRole): OtpChannel[] {
+/** The verification methods an account may use. SMS only, for every role. */
+export function allowedChannelsForRole(): OtpChannel[] {
   return ['sms'];
 }
 

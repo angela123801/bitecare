@@ -117,7 +117,7 @@ export default function RegisterPage() {
       if (!userData.user) throw new Error('Account was created but no session was established.');
 
       // SMS is the only verification method, for every role.
-      const permitted = allowedChannelsForRole(form.role);
+      const permitted = allowedChannelsForRole();
       const options: OtpChannelOption[] = permitted.map((channel) => ({
         channel,
         destination_masked: normalizedPhone.slice(0, 4) + '****' + normalizedPhone.slice(-2),

@@ -1,5 +1,8 @@
 {
   "recommendations": [
-    "ritwickdey.liveserver"
+    "dbaeumer.vscode-eslint",
+    "bradlc.vscode-tailwindcss",
+    "denoland.vscode-deno",
+    "ms-azuretools.vscode-docker"
   ]
 }
