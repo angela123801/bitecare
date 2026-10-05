@@ -5,7 +5,8 @@ import { resendAccountOtp, verifyAccountOtp } from '@/lib/accounts';
 interface Props {
   open: boolean;
   userId: string | null;
-  email: string;
+  /** Masked mobile number the code was sent to. */
+  destination: string;
   deliveryFailed?: boolean;
   onClose: () => void;
   onVerified: () => void;
@@ -15,20 +16,13 @@ const CODE_LENGTH = 6;
 const OTP_TTL_SECONDS = 10 * 60;
 const RESEND_COOLDOWN_SECONDS = 60;
 
-function maskEmail(email: string): string {
-  const [name = '', domain] = email.split('@');
-  if (!domain) return email;
-  const shown = name.slice(0, 2);
-  return `${shown}${'*'.repeat(Math.max(name.length - 2, 3))}@${domain}`;
-}
-
 function formatClock(total: number): string {
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export default function OtpVerificationModal({ open, userId, email, deliveryFailed, onClose, onVerified }: Props) {
+export default function OtpVerificationModal({ open, userId, destination, deliveryFailed, onClose, onVerified }: Props) {
   const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(''));
   const [error, setError] = useState('');
   const [verifying, setVerifying] = useState(false);
@@ -131,9 +125,9 @@ export default function OtpVerificationModal({ open, userId, email, deliveryFail
       setSecondsLeft(OTP_TTL_SECONDS);
       setResendIn(RESEND_COOLDOWN_SECONDS);
       if (result.otp_sent) {
-        setInfo('A new code has been emailed.');
+        setInfo('A new code was sent by SMS.');
       } else {
-        setError('The email could not be sent. Check that the email service is configured, then try again.');
+        setError('The SMS could not be sent. Check that the SMS gateway is configured, then try again.');
       }
       inputs.current[0]?.focus();
     } catch (err: unknown) {
@@ -167,8 +161,8 @@ export default function OtpVerificationModal({ open, userId, email, deliveryFail
             </div>
             <h2 id="otp-title" className="text-lg font-bold text-gray-900 mb-2">Account verified</h2>
             <p className="text-sm text-gray-500 mb-6">
-              {email} is now verified and can sign in with the Staff ID (or mobile number) and the
-              password you set.
+              The account is now verified and can sign in with the Staff ID (or mobile number) and
+              the password you set.
             </p>
             <button type="button" onClick={onClose} className="btn-primary w-full py-2.5">Done</button>
           </div>
@@ -185,15 +179,15 @@ export default function OtpVerificationModal({ open, userId, email, deliveryFail
             </div>
 
             <p className="text-sm text-gray-600 mb-1">
-              We sent a verification code to
+              We sent a verification code by SMS to
             </p>
-            <p className="text-sm font-semibold text-gray-900 mb-4">{maskEmail(email)}</p>
+            <p className="text-sm font-semibold text-gray-900 mb-4">{destination || 'the registered mobile number'}</p>
 
             {deliveryFailed && !info && (
               <div className="mb-4 p-3 rounded-lg bg-warning-50 border border-warning-200 text-warning-800 text-sm">
-                <p className="font-medium">The verification email could not be sent</p>
+                <p className="font-medium">The verification text could not be sent</p>
                 <p className="text-xs mt-0.5">
-                  The email service is not configured. Set it up, then use Resend code below. The
+                  The SMS gateway is not configured. Set it up, then use Resend code below. The
                   account exists but stays locked until the code is confirmed.
                 </p>
               </div>

@@ -10,10 +10,6 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-// Email (Resend)
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const EMAIL_FROM = Deno.env.get('EMAIL_FROM') ?? 'BiteCare <onboarding@resend.dev>';
-
 // SMS providers. TextBee is the free default: it sends through an Android
 // phone paired with the account, so it costs nothing per message. Semaphore,
 // Twilio and Vonage remain as fallbacks. The first configured one is used.
@@ -44,23 +40,11 @@ function json(data: unknown, status = 200) {
   });
 }
 
-/** Mask an email so the UI can confirm where a code went without exposing it. */
-function maskEmail(email: string): string {
-  const [name = '', domain] = email.split('@');
-  if (!domain) return '***';
-  const shown = name.slice(0, 2);
-  return `${shown}${'*'.repeat(Math.max(name.length - 2, 3))}@${domain}`;
-}
-
 /** Mask a phone number, keeping the prefix and last two digits. */
 function maskPhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
   if (digits.length < 6) return '******';
   return `${digits.slice(0, 4)}****${digits.slice(-2)}`;
-}
-
-function maskDestination(channel: Channel, destination: string): string {
-  return channel === 'email' ? maskEmail(destination) : maskPhone(destination);
 }
 
 /** Philippine mobile numbers only: 09XXXXXXXXX (11 digits). */
@@ -78,10 +62,6 @@ function toInternationalPh(phone: string): string {
 
 const textbeeSimId = Number(TEXTBEE_SIM_ID);
 
-function emailConfigured(): boolean {
-  return Boolean(RESEND_API_KEY);
-}
-
 function smsProvider(): 'textbee' | 'semaphore' | 'twilio' | 'vonage' | null {
   if (TEXTBEE_API_KEY) return 'textbee';
   if (SEMAPHORE_API_KEY) return 'semaphore';
@@ -95,7 +75,7 @@ function smsConfigured(): boolean {
 }
 
 function providerConfigured(channel: Channel): boolean {
-  return channel === 'email' ? emailConfigured() : smsConfigured();
+  return channel === 'sms' && smsConfigured();
 }
 
 function otpMessage(purpose: Purpose, code: string): string {
@@ -106,40 +86,6 @@ function otpMessage(purpose: Purpose, code: string): string {
         ? 'to confirm your new number'
         : 'to sign in';
   return `Your BiteCare verification code is ${code}. Use it ${context}. It expires in 5 minutes. Never share this code.`;
-}
-
-function otpEmailHtml(purpose: Purpose, code: string): string {
-  const line =
-    purpose === 'password_recovery'
-      ? 'Use this code to reset your password.'
-      : purpose === 'contact_change'
-        ? 'Use this code to confirm your new contact number.'
-        : 'Use this code to finish signing in.';
-  return `<div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px">
-    <h2 style="color:#0f766e;margin:0 0 8px">BiteCare</h2>
-    <p style="color:#374151">${line}</p>
-    <p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#111827;margin:16px 0">${code}</p>
-    <p style="color:#6b7280;font-size:14px">This code expires in 5 minutes and can only be used once. If you did not request it, ignore this email and consider changing your password.</p>
-  </div>`;
-}
-
-async function sendEmail(to: string, purpose: Purpose, code: string): Promise<boolean> {
-  if (!RESEND_API_KEY) return false;
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: EMAIL_FROM,
-        to: [to],
-        subject: 'Your BiteCare verification code',
-        html: otpEmailHtml(purpose, code),
-      }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
 }
 
 async function sendSms(to: string, purpose: Purpose, code: string): Promise<boolean> {
@@ -219,7 +165,7 @@ async function sendSms(to: string, purpose: Purpose, code: string): Promise<bool
 }
 
 async function deliver(channel: Channel, to: string, purpose: Purpose, code: string): Promise<boolean> {
-  return channel === 'email' ? sendEmail(to, purpose, code) : sendSms(to, purpose, code);
+  return channel === 'sms' ? sendSms(to, purpose, code) : false;
 }
 
 /** Resolve a signed-in caller from the Authorization header, if present. */
@@ -278,15 +224,11 @@ Deno.serve(async (req: Request) => {
 
       const role = String(resolved.role);
       const phone = String(resolved.phone ?? '');
-      const email = String(resolved.email ?? '');
 
       const { data: allowed } = await adminClient.rpc('otp_allowed_channels', { p_role: role });
       const allowedList = (allowed as string[]) ?? [];
 
       const channels: { channel: Channel; destination_masked: string }[] = [];
-      if (allowedList.includes('email') && email) {
-        channels.push({ channel: 'email', destination_masked: maskEmail(email) });
-      }
       if (allowedList.includes('sms') && isValidPhMobile(phone)) {
         channels.push({ channel: 'sms', destination_masked: maskPhone(phone) });
       }
@@ -301,7 +243,7 @@ Deno.serve(async (req: Request) => {
       const purpose = body.purpose as Purpose;
       const channel = body.channel as Channel;
       if (!PURPOSES.includes(purpose)) return json({ error: 'Invalid request' }, 400);
-      if (channel !== 'email' && channel !== 'sms') return json({ error: 'Choose a verification method' }, 400);
+      if (channel !== 'sms') return json({ error: 'SMS is the only verification method' }, 400);
 
       let userId: string | null = null;
       let newPhone = '';
@@ -380,7 +322,7 @@ Deno.serve(async (req: Request) => {
       return json({
         ok: true,
         channel,
-        destination_masked: maskDestination(channel, destination),
+        destination_masked: maskPhone(destination),
         delivered,
         provider_configured: configured,
         expires_in: Number(created.expires_in ?? 300),
@@ -497,7 +439,12 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      // verification: the client marks the account verified and continues.
+      // Registration verification: activate the account now that the code has
+      // been confirmed. Self-registered accounts start as pending, so this is
+      // the step that lets them sign in.
+      if (purpose === 'verification') {
+        await adminClient.rpc('mark_account_verified', { p_user_id: userId });
+      }
       return json({ ok: true, purpose, user_id: userId });
     }
 

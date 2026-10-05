@@ -90,8 +90,9 @@ export default function RegisterPage() {
     if (form.password.length < 6) { setError('Password must be at least 6 characters'); return; }
     if (form.password !== form.confirmPassword) { setError('Passwords do not match'); return; }
 
-    if (form.role === 'user' && !form.phone.trim()) {
-      setError('Phone number is required for residents. It will be your login ID.');
+    const normalizedPhone = form.phone.replace(/\D/g, '').replace(/^63/, '0');
+    if (!/^0\d{10}$/.test(normalizedPhone)) {
+      setError('A valid Philippine mobile number is required (for example 09171234567). Your verification code is sent by SMS.');
       return;
     }
 
@@ -115,14 +116,11 @@ export default function RegisterPage() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Account was created but no session was established.');
 
-      // The role decides the available methods: residents are SMS only.
+      // SMS is the only verification method, for every role.
       const permitted = allowedChannelsForRole(form.role);
       const options: OtpChannelOption[] = permitted.map((channel) => ({
         channel,
-        destination_masked:
-          channel === 'email'
-            ? form.email.replace(/(.{2}).*(@.*)/, '$1***$2')
-            : form.phone.trim().slice(0, 4) + '****' + form.phone.trim().slice(-2),
+        destination_masked: normalizedPhone.slice(0, 4) + '****' + normalizedPhone.slice(-2),
       }));
       setChannels(options);
       const chosen = permitted[0];
@@ -229,7 +227,7 @@ export default function RegisterPage() {
                     </div>
                     {isStaff && (
                       <p className="text-xs text-primary-700 bg-primary-50 border border-primary-200 rounded-lg px-2.5 py-2 mt-2">
-                        Your staff ID will be generated automatically (e.g., {staffPrefix}-XXXXXX). You will use this ID to log in, and verify by email or SMS.
+                        Your staff ID will be generated automatically (e.g., {staffPrefix}-XXXXXX). You will use this ID to log in, and verify by SMS.
                       </p>
                     )}
                     {!isStaff && (
@@ -260,15 +258,17 @@ export default function RegisterPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                      Phone number {form.role === 'user' && <span className="text-primary-600">*</span>}
+                      Phone number <span className="text-primary-600">*</span>
                     </label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input id="phone" type="tel" value={form.phone} onChange={set('phone')} className="input-field pl-9" placeholder="09XX XXX XXXX" required={form.role === 'user'} />
+                      <input id="phone" type="tel" value={form.phone} onChange={set('phone')} className="input-field pl-9" placeholder="09XX XXX XXXX" required />
                     </div>
-                    {form.role === 'user' && (
-                      <p className="text-xs text-gray-400 mt-1">This will be your login ID.</p>
-                    )}
+                    <p className="text-xs text-gray-400 mt-1">
+                      {form.role === 'user'
+                        ? 'This will be your login ID, and your verification code is sent here.'
+                        : 'Your verification code is sent to this number by SMS.'}
+                    </p>
                   </div>
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email address</label>

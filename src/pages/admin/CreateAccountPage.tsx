@@ -48,7 +48,12 @@ export default function CreateAccountPage() {
     if (!form.fullName.trim()) { setError('Full name is required.'); return; }
     if (!form.email.trim() || !form.email.includes('@')) { setError('A valid email address is required.'); return; }
     if (!allowedRoles.includes(form.role)) { setError('You are not allowed to create that role.'); return; }
-    if (form.role === 'user' && !/^0\d{10}$/.test(form.phone.replace(/[^0-9]/g, '').replace(/^63/, '0'))) {
+    const normalizedPhone = form.phone.replace(/[^0-9]/g, '').replace(/^63/, '0');
+    if (!isSuperAdmin && form.requireVerification && !/^0\d{10}$/.test(normalizedPhone)) {
+      setError('A valid mobile number (for example 09171234567) is required because the verification code is sent by SMS.');
+      return;
+    }
+    if (form.role === 'user' && !/^0\d{10}$/.test(normalizedPhone)) {
       setError('A resident needs a valid mobile number (for example 09171234567) because it is their login ID.');
       return;
     }
@@ -94,7 +99,7 @@ export default function CreateAccountPage() {
         <p className="text-sm text-gray-500 mt-1">
           {isSuperAdmin
             ? 'Accounts you create are activated immediately, with no verification code. You set the password and the system generates the login ID.'
-            : 'Add a new account. A verification code is required before the account can be used.'}
+            : 'Add a new account. The holder verifies by SMS code before the account can be used.'}
         </p>
       </div>
 
@@ -136,7 +141,7 @@ export default function CreateAccountPage() {
 
               {result!.requires_verification && !result!.otp_sent && (
                 <div className="mb-4 p-3 rounded-lg bg-warning-50 border border-warning-200 text-warning-800 text-sm text-left">
-                  The verification email could not be sent because the email service is not configured.
+                  The verification text could not be sent because the SMS gateway is not configured.
                   The account exists but stays locked until the code is confirmed.
                 </div>
               )}
@@ -145,7 +150,7 @@ export default function CreateAccountPage() {
                 {result!.provisioning_mode === 'super_admin_exempt'
                   ? 'The account is active now. No verification code was required.'
                   : result!.requires_verification
-                    ? (result!.otp_sent ? 'A verification code has been emailed to the account holder.' : 'Verification is still pending.')
+                    ? (result!.otp_sent ? 'A verification code has been sent by SMS to the account holder.' : 'Verification is still pending.')
                     : 'The account is ready to sign in.'}
               </p>
               <div className="flex gap-3 justify-center">
@@ -205,7 +210,9 @@ export default function CreateAccountPage() {
                   <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
                     Contact number{' '}
                     <span className="text-gray-400 font-normal">
-                      {form.role === 'user' ? '(required for residents)' : '(optional)'}
+                      {form.role === 'user' || (!isSuperAdmin && form.requireVerification)
+                        ? '(required)'
+                        : '(optional)'}
                     </span>
                   </label>
                   <div className="relative">
@@ -217,7 +224,7 @@ export default function CreateAccountPage() {
                       onChange={set('phone')}
                       className="input-field pl-9"
                       placeholder="09XX XXX XXXX"
-                      required={form.role === 'user'}
+                      required={form.role === 'user' || (!isSuperAdmin && form.requireVerification)}
                     />
                   </div>
                 </div>
@@ -340,8 +347,8 @@ export default function CreateAccountPage() {
                       Require verification code
                     </span>
                     <span className="block text-xs text-gray-500">
-                      Send a one-time code to the person&apos;s email. The account stays locked until the
-                      correct code is entered.
+                      Send a one-time code by SMS to the number above. The account stays locked until
+                      the correct code is entered.
                     </span>
                   </span>
                 </label>
@@ -363,7 +370,7 @@ export default function CreateAccountPage() {
       <OtpVerificationModal
         open={showOtp}
         userId={result?.user_id ?? null}
-        email={result?.email ?? ''}
+        destination={result?.destination_masked ?? form.phone}
         deliveryFailed={Boolean(result?.requires_verification && !result?.otp_sent)}
         onClose={() => setShowOtp(false)}
         onVerified={() => { /* success state handled by modal */ }}

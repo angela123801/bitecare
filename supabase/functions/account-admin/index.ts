@@ -9,8 +9,12 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const EMAIL_FROM = Deno.env.get('EMAIL_FROM') ?? 'BiteCare <onboarding@resend.dev>';
+// SMS verification. TextBee is the configured gateway; Semaphore is a fallback.
+const TEXTBEE_API_KEY = Deno.env.get('TEXTBEE_API_KEY');
+const TEXTBEE_DEVICE_ID = Deno.env.get('TEXTBEE_DEVICE_ID');
+const TEXTBEE_SIM_ID = Deno.env.get('TEXTBEE_SIM_ID');
+const SEMAPHORE_API_KEY = Deno.env.get('SEMAPHORE_API_KEY');
+const SEMAPHORE_SENDER = Deno.env.get('SEMAPHORE_SENDER_NAME');
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -19,26 +23,66 @@ function json(data: unknown, status = 200) {
   });
 }
 
-async function sendOtpEmail(email: string, code: string): Promise<boolean> {
-  if (!RESEND_API_KEY) return false;
+/** Philippine mobile numbers only: 09XXXXXXXXX (11 digits). */
+function isValidPhMobile(phone: string): boolean {
+  return /^09[0-9]{9}$/.test(phone);
+}
+
+/** Mask a phone number, keeping the prefix and last two digits. */
+function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 6) return '******';
+  return `${digits.slice(0, 4)}****${digits.slice(-2)}`;
+}
+
+/** TextBee expects international format, so 09XXXXXXXXX becomes +639XXXXXXXXX. */
+function toInternationalPh(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('63')) return `+${digits}`;
+  if (digits.startsWith('0')) return `+63${digits.slice(1)}`;
+  return `+63${digits}`;
+}
+
+/**
+ * Send a verification code by SMS. Returns false when no gateway is configured
+ * or the send failed, so the caller reports delivery honestly instead of
+ * pretending the message went out.
+ */
+async function sendOtpSms(phone: string, code: string): Promise<boolean> {
+  const text = `Your BiteCare verification code is ${code}. Use it to verify the new account. It expires in 5 minutes. Never share this code.`;
   try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: EMAIL_FROM,
-        to: [email],
-        subject: 'Your BiteCare verification code',
-        html: `
-          <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px">
-            <h2 style="color:#0f766e;margin:0 0 8px">BiteCare</h2>
-            <p style="color:#374151">Use this code to verify the new account:</p>
-            <p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#111827;margin:16px 0">${code}</p>
-            <p style="color:#6b7280;font-size:14px">This code expires in 10 minutes and can only be used once. If you did not expect this, ignore this email.</p>
-          </div>`,
-      }),
-    });
-    return res.ok;
+    if (TEXTBEE_API_KEY) {
+      const simId = Number(TEXTBEE_SIM_ID);
+      const res = await fetch('https://api.textbee.dev/api/v1/gateway/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': TEXTBEE_API_KEY },
+        body: JSON.stringify({
+          recipients: [toInternationalPh(phone)],
+          message: text,
+          ...(TEXTBEE_DEVICE_ID ? { deviceId: TEXTBEE_DEVICE_ID } : {}),
+          ...(Number.isInteger(simId) ? { simSubscriptionId: simId } : {}),
+        }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json().catch(() => null);
+      return data?.data?.success !== false;
+    }
+
+    if (SEMAPHORE_API_KEY) {
+      const res = await fetch('https://api.semaphore.co/api/v4/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apikey: SEMAPHORE_API_KEY,
+          number: phone,
+          message: text,
+          ...(SEMAPHORE_SENDER ? { sendername: SEMAPHORE_SENDER } : {}),
+        }),
+      });
+      return res.ok;
+    }
+
+    return false;
   } catch {
     return false;
   }
@@ -102,6 +146,12 @@ Deno.serve(async (req: Request) => {
       // activated immediately. No code is generated or sent, and the account is
       // never held back waiting on email or SMS verification.
       const verificationRequired = isSuperAdmin ? false : !!requireVerification;
+
+      // Verification is by SMS only, so a reachable mobile number is required
+      // whenever a code will be sent.
+      if (verificationRequired && !isValidPhMobile(phone ?? '')) {
+        return json({ error: 'A valid Philippine mobile number is required for SMS verification' }, 400);
+      }
 
       // Authorise + validate the role and record the audit trail. This runs as
       // the signed-in caller, so the database's own role matrix is the source
@@ -171,7 +221,7 @@ Deno.serve(async (req: Request) => {
         });
         if (otpErr) return json({ error: otpErr.message }, 500);
         const code = (otpData as { otp: string }).otp;
-        otpSent = await sendOtpEmail(email, code);
+        otpSent = await sendOtpSms(phone ?? '', code);
       } else {
         // No verification step at all: activate the account now.
         await adminClient.rpc('mark_account_verified', { p_user_id: newUserId });
@@ -210,6 +260,7 @@ Deno.serve(async (req: Request) => {
         requires_verification: verificationRequired,
         provisioning_mode: isSuperAdmin ? 'super_admin_exempt' : 'standard',
         otp_sent: otpSent,
+        destination_masked: verificationRequired ? maskPhone(phone ?? '') : null,
       });
     }
 
@@ -220,12 +271,15 @@ Deno.serve(async (req: Request) => {
 
       const { data: target } = await adminClient
         .from('profiles')
-        .select('email, verification_status')
+        .select('phone, verification_status')
         .eq('id', userId)
         .maybeSingle();
       if (!target) return json({ error: 'Account not found' }, 404);
       if (target.verification_status === 'verified') {
         return json({ error: 'This account is already verified' }, 400);
+      }
+      if (!isValidPhMobile(target.phone ?? '')) {
+        return json({ error: 'No valid mobile number is on file for this account' }, 400);
       }
 
       const { data: otpData, error: otpErr } = await adminClient.rpc('generate_verification_otp', {
@@ -234,9 +288,9 @@ Deno.serve(async (req: Request) => {
       if (otpErr) return json({ error: otpErr.message }, 400);
 
       const code = (otpData as { otp: string }).otp;
-      const otpSent = await sendOtpEmail(target.email, code);
+      const otpSent = await sendOtpSms(target.phone ?? '', code);
 
-      return json({ ok: true, otp_sent: otpSent });
+      return json({ ok: true, otp_sent: otpSent, destination_masked: maskPhone(target.phone ?? '') });
     }
 
     // ---------- Verify code ----------

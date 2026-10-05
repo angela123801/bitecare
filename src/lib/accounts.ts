@@ -33,11 +33,13 @@ export interface CreateAccountResult {
   requires_verification: boolean;
   provisioning_mode: 'super_admin_exempt' | 'standard';
   otp_sent: boolean;
+  destination_masked?: string | null;
 }
 
 export interface ResendResult {
   ok: true;
   otp_sent: boolean;
+  destination_masked?: string;
 }
 
 async function invoke<T>(body: Record<string, unknown>): Promise<T> {

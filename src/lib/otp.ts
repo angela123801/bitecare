@@ -45,15 +45,18 @@ export class OtpError extends Error {
   }
 }
 
-/** Only a resident is restricted to SMS; every staff role may use email or SMS. */
-export function allowedChannelsForRole(role: UserRole | undefined): OtpChannel[] {
-  return role === 'user' ? ['sms'] : ['email', 'sms'];
-}
-
 export const CHANNEL_LABELS: Record<OtpChannel, string> = {
   email: 'Email',
   sms: 'SMS',
 };
+
+/**
+ * Which verification methods an account may use. SMS is the only supported
+ * method, for every role; the server enforces the same rule independently.
+ */
+export function allowedChannelsForRole(_role?: UserRole): OtpChannel[] {
+  return ['sms'];
+}
 
 /**
  * Plain-language outcome for a code send. Keeps "no provider is set up" apart
