@@ -1,0 +1,68 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dev",
+      "detail": "Start the BiteCare development server (Vite) on http://localhost:5173",
+      "type": "npm",
+      "script": "dev",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": [{ "regexp": "^$" }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*VITE.*",
+          "endsPattern": ".*Local:.*"
+        }
+      },
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "build",
+      "detail": "Type-check and build BiteCare into dist/",
+      "type": "npm",
+      "script": "build",
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "typecheck",
+      "detail": "Run the TypeScript compiler with no output",
+      "type": "npm",
+      "script": "typecheck",
+      "group": "test",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "lint",
+      "detail": "Run ESLint over the project",
+      "type": "npm",
+      "script": "lint",
+      "group": "test",
+      "problemMatcher": ["$eslint-stylish"]
+    },
+    {
+      "label": "supabase:start",
+      "detail": "Start the local Supabase stack (Docker required)",
+      "type": "npm",
+      "script": "supabase:start",
+      "problemMatcher": []
+    },
+    {
+      "label": "supabase:stop",
+      "detail": "Stop the local Supabase stack",
+      "type": "npm",
+      "script": "supabase:stop",
+      "problemMatcher": []
+    },
+    {
+      "label": "supabase:reset",
+      "detail": "Reset the local database (re-apply migrations and seed)",
+      "type": "npm",
+      "script": "supabase:reset",
+      "problemMatcher": []
+    }
+  ]
+}

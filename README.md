@@ -157,16 +157,25 @@ Use one of these instead:
 | Debug in the browser | Run and Debug → “BiteCare: Chrome” |
 | Preview the built app | `npm run build`, then `npm run preview` |
 
-If you specifically want to use the Go Live button, build first and point Live Server at
-the built folder:
+If you specifically want to use the Go Live button, it is already set up:
 
 1. Run `npm run build` to create `dist/`.
-2. In `.vscode/settings.json`, add `"liveServer.settings.root": "/dist"`.
-3. Open `dist/index.html` and click **Go Live**.
+2. Open `dist/index.html` and click **Go Live**.
 
-The built app then loads, but note that Live Server has no single-page-app fallback, so
-refreshing on a deep link such as `/admin/users` will show a “not found” page. Use
-`npm run dev` or `npm run preview` if that matters.
+This works because `liveServer.settings.root` is already set to `/dist` in
+`.vscode/settings.json`. Remember to run `npm run build` again after each change, since
+Live Server serves the built files rather than the source.
+
+Live Server also has no single-page-app fallback, so refreshing on a deep link such as
+`/admin/users` will show a “not found” page. Use `npm run dev` or `npm run preview` if
+that matters.
+
+> **If the `.vscode` folder ever goes missing**, backup copies of all four files are kept
+> in `docs/vscode/`. Copy them back with:
+>
+> ```bash
+> mkdir -p .vscode && cp docs/vscode/*.json .vscode/
+> ```
 
 ---
 
@@ -201,7 +210,8 @@ project/
 ├── database/                Database schema reference and how-to for schema work
 ├── docs/                    System documentation
 │   ├── ARCHITECTURE.md      How the app is put together, roles, routes, data flow
-│   └── DATABASE.md          Full schema, relationships, RLS, functions, storage
+│   ├── DATABASE.md          Full schema, relationships, RLS, functions, storage
+│   └── vscode/              Backup copies of the .vscode files
 ├── public/                  Static assets served as-is (logo, background, PWA icons)
 ├── src/                     Application source code
 │   ├── components/          Reusable UI (layout, auth, admin, map)
