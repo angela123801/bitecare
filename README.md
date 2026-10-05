@@ -139,6 +139,35 @@ The `.vscode/` folder is included and ready to use:
 For the Chrome debugger to work, the **Debugger for Chrome** / built-in JavaScript
 debugger must be enabled (it is bundled with VS Code by default).
 
+### About the “Go Live” button (Live Server)
+
+The file the **Go Live** button opens is **`index.html`** in the project root. On its own
+that will show a **blank page**, and this is expected rather than a fault.
+
+`index.html` loads `/src/main.tsx`, which is TypeScript and React. A plain web server
+cannot run TypeScript, so the browser receives a file it cannot execute. BiteCare has to
+be compiled by Vite first — that compilation is what `npm run dev` and `npm run build`
+do. This is true of every Vite project, not just this one.
+
+Use one of these instead:
+
+| Goal | What to do |
+|------|------------|
+| Develop with live reload | `npm run dev` — open http://localhost:5173 |
+| Debug in the browser | Run and Debug → “BiteCare: Chrome” |
+| Preview the built app | `npm run build`, then `npm run preview` |
+
+If you specifically want to use the Go Live button, build first and point Live Server at
+the built folder:
+
+1. Run `npm run build` to create `dist/`.
+2. In `.vscode/settings.json`, add `"liveServer.settings.root": "/dist"`.
+3. Open `dist/index.html` and click **Go Live**.
+
+The built app then loads, but note that Live Server has no single-page-app fallback, so
+refreshing on a deep link such as `/admin/users` will show a “not found” page. Use
+`npm run dev` or `npm run preview` if that matters.
+
 ---
 
 ## 6. Available scripts
