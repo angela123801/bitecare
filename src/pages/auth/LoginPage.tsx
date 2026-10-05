@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLE_LABELS } from '@/config/constants';
+import { ROLE_MISMATCH_MESSAGE } from '@/lib/navigation';
 import { Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, Phone, IdCard } from 'lucide-react';
 import type { UserRole } from '@/types';
 import { useInstallApp } from '@/lib/installPrompt';
@@ -18,7 +19,7 @@ import {
 } from '@/lib/otp';
 
 export default function LoginPage() {
-  const { applySession } = useAuth();
+  const { applySession, signOut } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const preselectedRole = searchParams.get('role') as UserRole | null;
@@ -144,7 +145,17 @@ export default function LoginPage() {
       if (!result.access_token || !result.refresh_token) {
         throw new OtpError('Could not start your session. Please try again.');
       }
-      await applySession(result.access_token, result.refresh_token);
+      const profile = await applySession(result.access_token, result.refresh_token);
+
+      // The role chosen on the previous screen must match the account's real
+      // role. The database remains the authority — this only keeps the sign-in
+      // journey honest, so a Resident cannot sign in through the Admin card.
+      if (preselectedRole && profile && profile.role !== preselectedRole) {
+        await signOut();
+        setError(`${ROLE_MISMATCH_MESSAGE} This is a ${ROLE_LABELS[profile.role]} account.`);
+        return;
+      }
+
       navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Verification failed';

@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import type { Barangay, UserRole } from '@/types';
-import { ROLE_LABELS } from '@/config/constants';
-import { LOGIN_ROLES } from '@/lib/navigation';
+import type { Barangay } from '@/types';
 import { getErrorMessage } from '@/lib/utils';
 import {
-  Eye, EyeOff, Loader2, ChevronDown, AlertCircle, Lock, ShieldCheck,
-  Phone, Mail, User as UserIcon, MapPin, CheckCircle2,
+  Eye, EyeOff, Loader2, ChevronDown, AlertCircle, Lock,
+  Phone, Mail, User as UserIcon, MapPin, CheckCircle2, Home,
 } from 'lucide-react';
 import OtpPanel from '@/components/auth/OtpPanel';
 import {
@@ -30,10 +28,10 @@ export default function RegisterPage() {
     fullName: '',
     email: '',
     phone: '',
+    address: '',
     password: '',
     confirmPassword: '',
     barangayId: '',
-    role: 'user' as UserRole,
   });
   const [barangays, setBarangays] = useState<Barangay[]>([]);
   const [openRegistration, setOpenRegistration] = useState(false);
@@ -106,10 +104,10 @@ export default function RegisterPage() {
       if (signUpError) throw signUpError;
 
       const { error: completeError } = await supabase.rpc('public_complete_registration', {
-        p_role: form.role,
         p_full_name: form.fullName.trim(),
         p_phone: form.phone.trim(),
         p_barangay_id: form.barangayId || null,
+        p_address: form.address.trim(),
       });
       if (completeError) throw completeError;
 
@@ -180,9 +178,6 @@ export default function RegisterPage() {
     }
   };
 
-  const isStaff = form.role !== 'user';
-  const staffPrefix = form.role === 'super_admin' ? 'BC-SADM' : form.role === 'admin' ? 'BC-ADM' : form.role === 'health_worker' ? 'BC-HW' : '';
-
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4 sm:p-6 relative"
@@ -203,9 +198,7 @@ export default function RegisterPage() {
           {step === 'form' && (
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-1">Get started</h2>
-              <p className="text-gray-500 text-sm mb-5">
-                {isStaff ? 'Create your staff account' : 'Create your resident account'}
-              </p>
+              <p className="text-gray-500 text-sm mb-5">Create your resident account</p>
 
               {error && (
                 <div className="mb-4 p-3 rounded-lg bg-danger-50 border border-danger-200 text-danger-700 text-sm flex items-center gap-2">
@@ -214,38 +207,27 @@ export default function RegisterPage() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                {openRegistration ? (
-                  <div>
-                    <label htmlFor="registerRole" className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1">
-                      <ShieldCheck className="w-4 h-4 text-primary-600" /> Account role
-                    </label>
-                    <div className="relative">
-                      <select id="registerRole" value={form.role} onChange={set('role')} className="input-field appearance-none pr-10" required>
-                        {LOGIN_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    </div>
-                    {isStaff && (
-                      <p className="text-xs text-primary-700 bg-primary-50 border border-primary-200 rounded-lg px-2.5 py-2 mt-2">
-                        Your staff ID will be generated automatically (e.g., {staffPrefix}-XXXXXX). You will use this ID to log in, and verify by SMS.
-                      </p>
-                    )}
-                    {!isStaff && (
-                      <p className="text-xs text-warning-700 bg-warning-50 border border-warning-200 rounded-lg px-2.5 py-2 mt-2">
-                        As a resident, your phone number will be your login ID and you will verify by SMS.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Account role</label>
-                    <div className="relative">
-                      <input type="text" value="Resident" readOnly disabled className="input-field bg-gray-100 text-gray-600 cursor-not-allowed" />
-                      <Lock className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1.5">Public registration creates Resident accounts only.</p>
+                {!openRegistration && (
+                  <div className="p-3 rounded-lg bg-warning-50 border border-warning-200 text-warning-800 text-sm flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>
+                      Resident registration is currently closed. Please ask an Admin or Health Worker
+                      to create your account.
+                    </span>
                   </div>
                 )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Account type</label>
+                  <div className="relative">
+                    <input type="text" value="Resident" readOnly disabled className="input-field bg-gray-100 text-gray-600 cursor-not-allowed" />
+                    <Lock className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  </div>
+                  <p className="text-xs text-warning-700 bg-warning-50 border border-warning-200 rounded-lg px-2.5 py-2 mt-2">
+                    Your mobile number becomes your login ID, and you will verify by SMS. Staff accounts
+                    are created by an Admin or Super Admin.
+                  </p>
+                </div>
 
                 <div>
                   <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">Full name</label>
@@ -265,9 +247,7 @@ export default function RegisterPage() {
                       <input id="phone" type="tel" value={form.phone} onChange={set('phone')} className="input-field pl-9" placeholder="09XX XXX XXXX" required />
                     </div>
                     <p className="text-xs text-gray-400 mt-1">
-                      {form.role === 'user'
-                        ? 'This will be your login ID, and your verification code is sent here.'
-                        : 'Your verification code is sent to this number by SMS.'}
+                      This will be your login ID, and your verification code is sent here.
                     </p>
                   </div>
                   <div>
@@ -291,6 +271,14 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
+                <div>
+                  <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                  <div className="relative">
+                    <Home className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input id="address" type="text" value={form.address} onChange={set('address')} className="input-field pl-9" placeholder="House no., street, purok" />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
@@ -307,7 +295,7 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 py-2.5">
+                <button type="submit" disabled={loading || !openRegistration} className="btn-primary w-full flex items-center justify-center gap-2 py-2.5 disabled:opacity-60">
                   {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                   {loading ? 'Creating account...' : 'Create account'}
                 </button>
@@ -342,9 +330,7 @@ export default function RegisterPage() {
               </div>
               <h2 className="text-lg font-bold text-gray-900 mb-2">Account verified</h2>
               <p className="text-sm text-gray-500 mb-6">
-                {isStaff
-                  ? 'Your staff ID has been generated. You can now sign in using it.'
-                  : 'Your account is ready. You can now sign in with your phone number.'}
+                Your account is ready. You can now sign in with your phone number.
               </p>
               <button type="button" onClick={() => navigate('/login', { replace: true })} className="btn-primary w-full py-2.5">
                 Go to sign in

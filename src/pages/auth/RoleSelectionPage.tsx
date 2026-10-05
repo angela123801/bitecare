@@ -1,9 +1,29 @@
 import { useNavigate } from 'react-router-dom';
 import { Shield, UserCog, Stethoscope, User, ArrowRight } from 'lucide-react';
 import { ROLE_LABELS } from '@/config/constants';
+import { MOBILE_LOGIN_ROLES } from '@/lib/navigation';
 import { useInstallApp } from '@/lib/installPrompt';
 import { Loader2, Download, Smartphone } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+/** Matches Tailwind's `sm` breakpoint (640px), which the grid below switches on. */
+const MOBILE_QUERY = '(max-width: 639px)';
+
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(MOBILE_QUERY).matches
+  );
+
+  useEffect(() => {
+    const mql = window.matchMedia(MOBILE_QUERY);
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    setIsMobile(mql.matches);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  return isMobile;
+}
 
 interface RoleCard {
   role: string;
@@ -53,6 +73,13 @@ export default function RoleSelectionPage() {
   const navigate = useNavigate();
   const { canInstall, install, installing, platform } = useInstallApp();
   const [showIosHelp, setShowIosHelp] = useState(false);
+  const isMobile = useIsMobile();
+
+  // On phones only Health Worker and Resident are offered; on tablet and
+  // desktop all four roles remain available.
+  const visibleRoles = isMobile
+    ? roles.filter((r) => MOBILE_LOGIN_ROLES.includes(r.role as (typeof MOBILE_LOGIN_ROLES)[number]))
+    : roles;
 
   const handleInstall = async () => {
     if (platform === 'ios') {
@@ -107,7 +134,7 @@ export default function RoleSelectionPage() {
 
         {/* Role Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {roles.map((r) => (
+          {visibleRoles.map((r) => (
             <button
               key={r.role}
               onClick={() => handleRoleSelect(r.role)}
