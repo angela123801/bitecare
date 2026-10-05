@@ -32,10 +32,22 @@ Copy-Item docs\vscode\* .vscode\
 
 ## Note on the Go Live button
 
-`liveServer.settings.root` is set to `/dist`, so Go Live serves the **built** app. That
-means you must run `npm run build` first, and rebuild after every change. Live Server also
-has no single-page-app fallback, so refreshing on a deep link such as `/admin/users`
-returns “not found”.
+The reliable way is to right-click the **`dist` folder** and choose “Open with Live
+Server”, so the built app is served as the site root. Run `npm run build` first, and
+rebuild after every change.
 
-For normal work use `npm run dev` (http://localhost:5173), which reloads automatically and
-handles deep links correctly.
+`liveServer.settings.root` is also set to `/dist` in `settings.json` as a fallback, but
+right-clicking the folder works regardless. If you open the project **root** with Go Live
+you will get a blank white page, because the root `index.html` loads unbuilt TypeScript.
+
+Live Server also has no single-page-app fallback, so refreshing on a deep link such as
+`/admin/users` returns “not found”. Use `npm run dev` or `npm run preview` if that
+matters.
+
+If a white page persists, clear the service worker (F12 → Console):
+
+```js
+navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
+```
+
+then hard-reload with Ctrl+Shift+R.

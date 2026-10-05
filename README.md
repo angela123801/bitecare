@@ -157,18 +157,46 @@ Use one of these instead:
 | Debug in the browser | Run and Debug → “BiteCare: Chrome” |
 | Preview the built app | `npm run build`, then `npm run preview` |
 
-If you specifically want to use the Go Live button, it is already set up:
+If you specifically want to use the Go Live button, the reliable way is to serve the
+**built folder**, not the project root:
 
 1. Run `npm run build` to create `dist/`.
-2. Open `dist/index.html` and click **Go Live**.
+2. In the VS Code file list, **right-click the `dist` folder** and choose
+   **“Open with Live Server”**.
 
-This works because `liveServer.settings.root` is already set to `/dist` in
-`.vscode/settings.json`. Remember to run `npm run build` again after each change, since
-Live Server serves the built files rather than the source.
+Live Server serves whatever folder you right-click **as the site root**, so this works
+even if `.vscode/settings.json` is missing. The address bar will still read
+`http://127.0.0.1:5500/` — what matters is which folder you clicked. Serving `dist` is what
+makes the app’s `/assets/…` files resolve, because the build expects them at the site
+root.
+
+Opening the project **root** instead is what produces a **blank white page**: its
+`index.html` points at unbuilt TypeScript that the browser cannot run.
+
+Remember to run `npm run build` again after each change; Live Server serves the built
+files, not the source.
 
 Live Server also has no single-page-app fallback, so refreshing on a deep link such as
 `/admin/users` will show a “not found” page. Use `npm run dev` or `npm run preview` if
 that matters.
+
+### If you still see a white page
+
+Work through these in order:
+
+1. **Confirm the path** ends in `/dist/`. If not, right-click the `dist` folder again.
+2. **Rebuild**: `npm run build`, then reload the page.
+3. **Open the browser console** (F12 → Console). A failed `/assets/index-….js` request
+   means the built files are being served from the wrong root.
+4. **Clear the service worker.** BiteCare registers one, and it can keep serving a stale
+   or failed response. In the console run:
+   ```js
+   navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
+   ```
+   then hard-reload with **Ctrl+Shift+R**.
+5. **Just use `npm run dev`** and open http://localhost:5173. This is the intended
+   development workflow: it compiles automatically, reloads on save, and handles deep
+   links correctly. It avoids every issue above.
 
 > **If the `.vscode` folder ever goes missing**, backup copies of all four files are kept
 > in `docs/vscode/`. Copy them back with:
