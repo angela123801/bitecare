@@ -12,6 +12,7 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 // SMS verification. TextBee is the configured gateway; Semaphore is a fallback.
 const TEXTBEE_API_KEY = Deno.env.get('TEXTBEE_API_KEY');
 const TEXTBEE_DEVICE_ID = Deno.env.get('TEXTBEE_DEVICE_ID');
+const TEXTBEE_SIM_ID = Deno.env.get('TEXTBEE_SIM_ID');
 const SEMAPHORE_API_KEY = Deno.env.get('SEMAPHORE_API_KEY');
 const SEMAPHORE_SENDER = Deno.env.get('SEMAPHORE_SENDER_NAME');
 
@@ -28,7 +29,7 @@ interface SmsResult {
 function textbeeMessageId(result: unknown): string | undefined {
   if (!result || typeof result !== 'object') return undefined;
   const r = result as Record<string, unknown>;
-  const candidates = [r.messageId, r.batchId, r.batch_id, r.id];
+  const candidates = [r.smsBatchId, r.messageId, r.batchId, r.batch_id, r.id];
   const found = candidates.find((v) => typeof v === 'string' && v.length > 0);
   return found as string | undefined;
 }
@@ -74,6 +75,7 @@ function toInternationalPh(phone: string): string {
 async function sendOtpSms(phone: string, code: string): Promise<SmsResult> {
   const text = `Your BiteCare verification code is ${code}. Use it to verify the new account. It expires in 5 minutes. Never share this code.`;
   const hasFallback = Boolean(SEMAPHORE_API_KEY);
+  const simId = TEXTBEE_SIM_ID ? Number(TEXTBEE_SIM_ID) : null;
 
   if (TEXTBEE_API_KEY) {
     try {
@@ -84,6 +86,7 @@ async function sendOtpSms(phone: string, code: string): Promise<SmsResult> {
           recipients: [toInternationalPh(phone)],
           message: text,
           ...(TEXTBEE_DEVICE_ID ? { deviceId: TEXTBEE_DEVICE_ID } : {}),
+          ...(simId !== null && Number.isFinite(simId) ? { simSubscriptionId: simId } : {}),
         }),
       });
       if (res.ok) {
@@ -91,10 +94,11 @@ async function sendOtpSms(phone: string, code: string): Promise<SmsResult> {
         const result = data?.data;
         if (result?.success !== false) {
           const messageId = textbeeMessageId(result);
-          if (!hasFallback) return { ok: true, messageId };
+          if (!hasFallback || !TEXTBEE_DEVICE_ID || !messageId) return { ok: true, messageId };
           await new Promise((resolve) => setTimeout(resolve, 700));
+          const query = new URLSearchParams({ smsBatchId: messageId, limit: '1' });
           const statusRes = await fetch(
-            `https://api.textbee.dev/api/v1/gateway/devices/${TEXTBEE_DEVICE_ID}/messages?limit=1`,
+            `https://api.textbee.dev/api/v1/gateway/messages?${query}`,
             { headers: { 'x-api-key': TEXTBEE_API_KEY } },
           );
           if (statusRes.ok) {

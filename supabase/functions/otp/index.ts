@@ -21,6 +21,7 @@ const SMSGATE_PASSWORD = Deno.env.get('SMSGATE_PASSWORD');
 const SMSGATE_DEVICE_ID = Deno.env.get('SMSGATE_DEVICE_ID');
 const TEXTBEE_API_KEY = Deno.env.get('TEXTBEE_API_KEY');
 const TEXTBEE_DEVICE_ID = Deno.env.get('TEXTBEE_DEVICE_ID');
+const TEXTBEE_SIM_ID = Deno.env.get('TEXTBEE_SIM_ID');
 const SEMAPHORE_API_KEY = Deno.env.get('SEMAPHORE_API_KEY');
 const SEMAPHORE_SENDER = Deno.env.get('SEMAPHORE_SENDER_NAME');
 const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
@@ -73,11 +74,11 @@ interface SmsResult {
   messageId?: string;
 }
 
-/** Pull the gateway's message/batch id out of a provider response. */
+/** Pull the gateway's send-batch id out of a TextBee response. */
 function textbeeMessageId(result: unknown): string | undefined {
   if (!result || typeof result !== 'object') return undefined;
   const r = result as Record<string, unknown>;
-  const candidates = [r.messageId, r.batchId, r.batch_id, r.id];
+  const candidates = [r.smsBatchId, r.messageId, r.batchId, r.batch_id, r.id];
   const found = candidates.find((v) => typeof v === 'string' && v.length > 0);
   return found as string | undefined;
 }
@@ -112,26 +113,24 @@ function otpMessage(purpose: Purpose, code: string): string {
 }
 
 /**
- * The gateway phone accepts a message with HTTP 200 and only then tries to push
- * it to the phone over FCM. When the phone's push token has gone stale (for
- * example after the phone restarts or the app is updated) the push fails a
- * moment later and the message is marked 'failed' — but the 200 has already
- * been returned, so a naive send looks successful while nothing is delivered.
- * When a second provider is configured we glance at the result once so we can
- * fall back instead of silently losing the code.
+ * TextBee accepts a send before the phone has actually handed the message to
+ * the carrier, so a 200 on its own does not prove the code left the handset.
+ * When a second provider is configured we look the batch up once and fall back
+ * if the phone has already reported it failed, rather than silently losing the
+ * code.
  */
-async function textbeeDeliveryFailed(): Promise<boolean> {
-  if (!TEXTBEE_DEVICE_ID) return false;
+async function textbeeDeliveryFailed(batchId: string | undefined): Promise<boolean> {
+  if (!TEXTBEE_DEVICE_ID || !batchId) return false;
   try {
     await new Promise((resolve) => setTimeout(resolve, 700));
+    const query = new URLSearchParams({ smsBatchId: batchId, limit: '1' });
     const res = await fetch(
-      `https://api.textbee.dev/api/v1/gateway/devices/${TEXTBEE_DEVICE_ID}/messages?limit=1`,
+      `https://api.textbee.dev/api/v1/gateway/messages?${query}`,
       { headers: { 'x-api-key': TEXTBEE_API_KEY! } },
     );
     if (!res.ok) return false;
     const data = await res.json().catch(() => null);
-    const latest = data?.data?.[0];
-    return latest?.status === 'failed';
+    return data?.data?.[0]?.status === 'failed';
   } catch {
     return false;
   }
@@ -165,6 +164,7 @@ async function sendViaProvider(provider: SmsProvider, to: string, text: string):
   }
 
   if (provider === 'textbee') {
+    const simId = TEXTBEE_SIM_ID ? Number(TEXTBEE_SIM_ID) : null;
     const res = await fetch('https://api.textbee.dev/api/v1/gateway/send-sms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': TEXTBEE_API_KEY! },
@@ -172,8 +172,11 @@ async function sendViaProvider(provider: SmsProvider, to: string, text: string):
         recipients: [toInternationalPh(to)],
         message: text,
         ...(TEXTBEE_DEVICE_ID ? { deviceId: TEXTBEE_DEVICE_ID } : {}),
+        ...(simId !== null && Number.isFinite(simId) ? { simSubscriptionId: simId } : {}),
       }),
     });
+    // A send the phone could not be reached for comes back as 400, so a failed
+    // push is caught here rather than after the fact.
     if (!res.ok) return { ok: false };
     const data = await res.json().catch(() => null);
     const result = data?.data;
@@ -182,8 +185,9 @@ async function sendViaProvider(provider: SmsProvider, to: string, text: string):
     if (result?.success === false) return { ok: false };
     if (typeof result?.failureCount === 'number' && result.failureCount > 0) return { ok: false };
     if (result?.warning) return { ok: false };
-    if (smsProviderChain().length > 1 && await textbeeDeliveryFailed()) return { ok: false };
-    return { ok: true, messageId: textbeeMessageId(result) };
+    const messageId = textbeeMessageId(result);
+    if (smsProviderChain().length > 1 && await textbeeDeliveryFailed(messageId)) return { ok: false };
+    return { ok: true, messageId };
   }
 
   if (provider === 'semaphore') {
