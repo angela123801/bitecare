@@ -12,7 +12,6 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 // SMS verification. TextBee is the configured gateway; Semaphore is a fallback.
 const TEXTBEE_API_KEY = Deno.env.get('TEXTBEE_API_KEY');
 const TEXTBEE_DEVICE_ID = Deno.env.get('TEXTBEE_DEVICE_ID');
-const TEXTBEE_SIM_ID = Deno.env.get('TEXTBEE_SIM_ID');
 const SEMAPHORE_API_KEY = Deno.env.get('SEMAPHORE_API_KEY');
 const SEMAPHORE_SENDER = Deno.env.get('SEMAPHORE_SENDER_NAME');
 
@@ -60,7 +59,6 @@ async function sendOtpSms(phone: string, code: string): Promise<boolean> {
 
   if (TEXTBEE_API_KEY) {
     try {
-      const simId = Number(TEXTBEE_SIM_ID);
       const res = await fetch('https://api.textbee.dev/api/v1/gateway/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': TEXTBEE_API_KEY },
@@ -68,7 +66,6 @@ async function sendOtpSms(phone: string, code: string): Promise<boolean> {
           recipients: [toInternationalPh(phone)],
           message: text,
           ...(TEXTBEE_DEVICE_ID ? { deviceId: TEXTBEE_DEVICE_ID } : {}),
-          ...(Number.isInteger(simId) ? { simSubscriptionId: simId } : {}),
         }),
       });
       if (res.ok) {

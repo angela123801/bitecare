@@ -15,10 +15,6 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 // Twilio and Vonage remain as fallbacks. The first configured one is used.
 const TEXTBEE_API_KEY = Deno.env.get('TEXTBEE_API_KEY');
 const TEXTBEE_DEVICE_ID = Deno.env.get('TEXTBEE_DEVICE_ID');
-// Which SIM in the gateway phone sends the messages. The phone's default SIM is
-// used when unset. Android reassigns these ids when a SIM is swapped, so read
-// the current value from the SIM Cards screen in the textbee app.
-const TEXTBEE_SIM_ID = Deno.env.get('TEXTBEE_SIM_ID');
 const SEMAPHORE_API_KEY = Deno.env.get('SEMAPHORE_API_KEY');
 const SEMAPHORE_SENDER = Deno.env.get('SEMAPHORE_SENDER_NAME');
 const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
@@ -59,8 +55,6 @@ function toInternationalPh(phone: string): string {
   if (digits.startsWith('0')) return `+63${digits.slice(1)}`;
   return `+63${digits}`;
 }
-
-const textbeeSimId = Number(TEXTBEE_SIM_ID);
 
 type SmsProvider = 'textbee' | 'semaphore' | 'twilio' | 'vonage';
 
@@ -127,12 +121,16 @@ async function sendViaProvider(provider: SmsProvider, to: string, text: string):
         recipients: [toInternationalPh(to)],
         message: text,
         ...(TEXTBEE_DEVICE_ID ? { deviceId: TEXTBEE_DEVICE_ID } : {}),
-        ...(Number.isInteger(textbeeSimId) ? { simSubscriptionId: textbeeSimId } : {}),
       }),
     });
     if (!res.ok) return false;
     const data = await res.json().catch(() => null);
-    if (data?.data?.success === false) return false;
+    const result = data?.data;
+    // `success` covers queued batches; `failureCount`/`warning` cover immediate
+    // dispatch. Either one failing means the code was not pushed to the phone.
+    if (result?.success === false) return false;
+    if (typeof result?.failureCount === 'number' && result.failureCount > 0) return false;
+    if (result?.warning) return false;
     if (smsProviderChain().length > 1 && await textbeeDeliveryFailed()) return false;
     return true;
   }
