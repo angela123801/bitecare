@@ -105,7 +105,7 @@ export default function UserManagementPage() {
     if (roleFilter !== 'all' && u.role !== roleFilter) return false;
     if (search) {
       const s = search.toLowerCase();
-      return u.full_name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s);
+      return u.full_name.toLowerCase().includes(s) || (u.email ?? '').toLowerCase().includes(s);
     }
     return true;
   });
@@ -179,7 +179,7 @@ export default function UserManagementPage() {
                   <tr key={u.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">{u.full_name || 'No name'}</p>
-                      <p className="text-xs text-gray-500">{u.email}</p>
+                      <p className="text-xs text-gray-500">{u.email ?? u.phone}</p>
                     </td>
                     <td className="px-4 py-3">
                       {editingRole === u.id ? (

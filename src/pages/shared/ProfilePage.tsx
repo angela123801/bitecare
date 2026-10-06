@@ -286,7 +286,7 @@ export default function ProfilePage() {
             ) : (
               <div className="w-24 h-24 rounded-full bg-primary-100 flex items-center justify-center ring-4 ring-primary-50">
                 <span className="text-2xl font-bold text-primary-700">
-                  {getInitials(profile.full_name || profile.email)}
+                  {getInitials(profile.full_name || profile.email || 'User')}
                 </span>
               </div>
             )}
@@ -310,7 +310,7 @@ export default function ProfilePage() {
             <h2 className="text-xl font-semibold text-gray-900">
               {profile.full_name || 'No name set'}
             </h2>
-            <p className="text-gray-500 text-sm">{profile.email}</p>
+            {profile.email && <p className="text-gray-500 text-sm">{profile.email}</p>}
             <div className="flex flex-wrap items-center gap-2 mt-2 justify-center sm:justify-start">
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
                 <ShieldCheck className="w-3 h-3" />
@@ -380,7 +380,7 @@ export default function ProfilePage() {
             <h3 className="font-semibold text-gray-900 mb-2">Personal Information</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <InfoRow icon={<User className="w-4 h-4" />} label="Full Name" value={profile.full_name} />
-              <InfoRow icon={<Mail className="w-4 h-4" />} label="Email" value={profile.email} />
+              <InfoRow icon={<Mail className="w-4 h-4" />} label="Email" value={profile.email ?? '—'} />
               {profile.staff_id && (
                 <InfoRow icon={<IdCard className="w-4 h-4" />} label="Staff ID" value={profile.staff_id} />
               )}

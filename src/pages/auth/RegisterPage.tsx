@@ -90,7 +90,13 @@ export default function RegisterPage() {
     setError('');
 
     if (!form.fullName.trim()) { setError('Full name is required'); return; }
-    if (!form.email.trim() || !form.email.includes('@')) { setError('A valid email address is required'); return; }
+    // Email is optional. When one is given it must look like an address; when
+    // the field is left blank registration continues without one.
+    const email = form.email.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Enter a valid email address, or leave the field blank.');
+      return;
+    }
     if (form.password.length < 6) { setError('Password must be at least 6 characters'); return; }
     if (form.password !== form.confirmPassword) { setError('Passwords do not match'); return; }
 
@@ -103,8 +109,13 @@ export default function RegisterPage() {
     setForm((f) => ({ ...f, phone: normalizedPhone }));
     setLoading(true);
     try {
+      // Supabase Auth identifies an account by an email, but residents may
+      // register without one. When the field is blank a reserved, internal
+      // address derived from the mobile number is used: it is never emailed and
+      // never shown, and the profile keeps its email as NULL.
+      const authEmail = email || `${normalizedPhone.replace(/\D/g, '')}@phone.bitecare.local`;
       const { error: signUpError } = await supabase.auth.signUp({
-        email: form.email,
+        email: authEmail,
         password: form.password,
         options: { data: { full_name: form.fullName.trim() } },
       });
@@ -259,11 +270,14 @@ export default function RegisterPage() {
                     </p>
                   </div>
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                      Email address <span className="text-gray-400 font-normal">(optional)</span>
+                    </label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input id="email" type="email" value={form.email} onChange={set('email')} className="input-field pl-9" placeholder="you@example.com" required autoComplete="email" />
+                      <input id="email" type="email" value={form.email} onChange={set('email')} className="input-field pl-9" placeholder="you@example.com" autoComplete="email" />
                     </div>
+                    <p className="text-xs text-gray-400 mt-1">You can leave this blank. Verification is by SMS.</p>
                   </div>
                 </div>
 

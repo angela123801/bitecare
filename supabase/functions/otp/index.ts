@@ -588,7 +588,10 @@ Deno.serve(async (req: Request) => {
         const r = resolved as Record<string, unknown>;
         if (r?.error) return json({ error: 'Invalid sign-in ID or password' }, 401);
         userId = String(r.id);
-        loginEmail = String(r.email);
+        // The session is opened against the address the auth server knows. For
+        // a resident who registered without an email that is the internal
+        // sign-in address, so it must come from `auth_email`, not `email`.
+        loginEmail = String(r.auth_email ?? r.email);
       } else if (purpose === 'password_recovery') {
         const identifier = String(body.identifier ?? '').trim();
         if (!identifier) return json({ error: 'Please restart the reset process' }, 401);
@@ -635,22 +638,22 @@ Deno.serve(async (req: Request) => {
       // can open a session and set a new password, without ever seeing a
       // password or the OTP again.
       if (purpose === 'password_recovery') {
-        const { data: profile } = await adminClient
-          .from('profiles')
-          .select('email')
-          .eq('id', userId)
-          .maybeSingle();
-        if (!profile?.email) return json({ error: 'No email is on file for this account' }, 400);
+        // The reset link must target the address the auth server knows; the
+        // public profile email can be empty for a resident who registered
+        // without one.
+        const { data: authUser } = await adminClient.auth.admin.getUserById(userId);
+        const recoveryEmail = authUser?.user?.email;
+        if (!recoveryEmail) return json({ error: 'No email is on file for this account' }, 400);
 
         const { data: link, error: linkErr } = await adminClient.auth.admin.generateLink({
           type: 'recovery',
-          email: profile.email,
+          email: recoveryEmail,
         });
         if (linkErr) return json({ error: 'Could not start password reset' }, 500);
         return json({
           ok: true,
           purpose,
-          email: profile.email,
+          email: recoveryEmail,
           recovery_token: link.properties?.hashed_token ?? null,
         });
       }

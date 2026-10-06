@@ -2,7 +2,7 @@ export type UserRole = 'user' | 'health_worker' | 'admin' | 'super_admin';
 
 export interface Profile {
   id: string;
-  email: string;
+  email: string | null;
   full_name: string;
   phone: string;
   avatar_url: string;
