@@ -4,6 +4,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import AppLayout from '@/components/layout/AppLayout';
 
 import RoleSelectionPage from '@/pages/auth/RoleSelectionPage';
+import MobileRoleSelectionPage from '@/pages/auth/MobileRoleSelectionPage';
 import LoginPage from '@/pages/auth/LoginPage';
 import RegisterPage from '@/pages/auth/RegisterPage';
 import ResetPasswordPage from '@/pages/auth/ResetPasswordPage';
@@ -32,8 +33,9 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Landing page — role selection */}
+          {/* Landing page — resident registration first on phones, role picker elsewhere */}
           <Route path="/" element={<RoleSelectionPage />} />
+          <Route path="/roles" element={<MobileRoleSelectionPage />} />
 
           {/* Public auth pages */}
           <Route path="/login" element={<LoginPage />} />

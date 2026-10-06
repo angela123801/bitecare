@@ -1,29 +1,10 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, UserCog, Stethoscope, User, ArrowRight } from 'lucide-react';
+import { Shield, UserCog, Stethoscope, User, ArrowRight, Loader2, Download, Smartphone, IdCard, ChevronRight } from 'lucide-react';
 import { ROLE_LABELS } from '@/config/constants';
 import { MOBILE_LOGIN_ROLES } from '@/lib/navigation';
 import { useInstallApp } from '@/lib/installPrompt';
-import { Loader2, Download, Smartphone } from 'lucide-react';
-import { useEffect, useState } from 'react';
-
-/** Matches Tailwind's `sm` breakpoint (640px), which the grid below switches on. */
-const MOBILE_QUERY = '(max-width: 639px)';
-
-function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia(MOBILE_QUERY).matches
-  );
-
-  useEffect(() => {
-    const mql = window.matchMedia(MOBILE_QUERY);
-    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    setIsMobile(mql.matches);
-    mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
-  }, []);
-
-  return isMobile;
-}
+import { useIsMobile } from '@/lib/useIsMobile';
 
 interface RoleCard {
   role: string;
@@ -122,43 +103,85 @@ export default function RoleSelectionPage() {
           <p className="text-white/60 text-xs font-medium mt-1">Bacolod City, Negros Occidental</p>
         </div>
 
-        {/* Title */}
-        <div className="text-center mb-6">
-          <h2 className="text-xl sm:text-2xl font-bold text-white drop-shadow-md">
-            Select Your Role
-          </h2>
-          <p className="text-white/70 text-sm mt-1 drop-shadow">
-            Choose your account type to continue
-          </p>
-        </div>
-
-        {/* Role Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {visibleRoles.map((r) => (
-            <button
-              key={r.role}
-              onClick={() => handleRoleSelect(r.role)}
-              className="group relative bg-white/95 backdrop-blur-md rounded-2xl border-2 p-5 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:-translate-y-1"
-              style={{
-                borderColor: 'rgba(255,255,255,0.3)',
-              }}
-            >
-              <div className={`w-14 h-14 rounded-2xl ${r.bgColor} flex items-center justify-center mb-3 transition-colors`}>
-                <span className={r.color}>{r.icon}</span>
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 group-hover:text-gray-700 transition-colors">
-                {ROLE_LABELS[r.role as keyof typeof ROLE_LABELS]}
-              </h3>
-              <p className="text-sm text-gray-500 mt-1 leading-relaxed">
-                {r.description}
+        {/* On phones, registration is the primary action and role choice is secondary. */}
+        {isMobile ? (
+          <>
+            <div className="text-center mb-5">
+              <h2 className="text-xl font-bold text-white drop-shadow-md">Welcome to BiteCare</h2>
+              <p className="text-white/70 text-sm mt-1 drop-shadow">
+                Create your account to report bites and track your treatment
               </p>
-              <div className="flex items-center gap-1.5 mt-3 text-xs font-semibold text-primary-600">
-                <span>Sign in</span>
-                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+            </div>
+
+            <button
+              onClick={() => navigate('/register')}
+              className="group w-full flex items-center gap-4 bg-white/95 backdrop-blur-md rounded-2xl border-2 border-white/30 p-5 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:-translate-y-1"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 group-hover:bg-amber-100 flex items-center justify-center flex-shrink-0 transition-colors">
+                <User className="w-8 h-8 text-amber-600" />
               </div>
+              <span className="min-w-0 flex-1">
+                <span className="block text-lg font-bold text-gray-900">Register as Resident</span>
+                <span className="block text-sm text-gray-500 mt-0.5 leading-relaxed">
+                  Sign up with your mobile number and verify by SMS
+                </span>
+                <span className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-primary-600">
+                  Create account
+                  <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                </span>
+              </span>
             </button>
-          ))}
-        </div>
+
+            <button
+              onClick={() => navigate('/login')}
+              className="group w-full flex items-center justify-between gap-3 mt-3 rounded-xl border border-white/25 bg-white/15 hover:bg-white/25 backdrop-blur-sm px-4 py-3 text-left transition-colors"
+            >
+              <span className="flex items-center gap-2 text-sm font-medium text-white">
+                <User className="w-4 h-4 flex-shrink-0" />
+                Already have an account? Sign in
+              </span>
+              <ChevronRight className="w-4 h-4 text-white/70 flex-shrink-0 transition-transform group-hover:translate-x-1" />
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="text-center mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-white drop-shadow-md">
+                Select Your Role
+              </h2>
+              <p className="text-white/70 text-sm mt-1 drop-shadow">
+                Choose your account type to continue
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {visibleRoles.map((r) => (
+                <button
+                  key={r.role}
+                  onClick={() => handleRoleSelect(r.role)}
+                  className="group relative bg-white/95 backdrop-blur-md rounded-2xl border-2 p-5 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:-translate-y-1"
+                  style={{
+                    borderColor: 'rgba(255,255,255,0.3)',
+                  }}
+                >
+                  <div className={`w-14 h-14 rounded-2xl ${r.bgColor} flex items-center justify-center mb-3 transition-colors`}>
+                    <span className={r.color}>{r.icon}</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 group-hover:text-gray-700 transition-colors">
+                    {ROLE_LABELS[r.role as keyof typeof ROLE_LABELS]}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+                    {r.description}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-3 text-xs font-semibold text-primary-600">
+                    <span>Sign in</span>
+                    <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Install App */}
         {canInstall && (
@@ -178,6 +201,23 @@ export default function RoleSelectionPage() {
                 <span>Tap the Share button in Safari, then choose Add to Home Screen.</span>
               </p>
             )}
+          </div>
+        )}
+
+        {/* Choose Different Role — revealed by the button below on phones. */}
+        {isMobile && (
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/roles')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-medium border border-white/25 transition-colors"
+            >
+              <IdCard className="w-4 h-4" />
+              Choose Different Role
+            </button>
+            <p className="text-white/60 text-xs text-center max-w-xs">
+              Health workers and staff sign in with a staff ID
+            </p>
           </div>
         )}
       </div>

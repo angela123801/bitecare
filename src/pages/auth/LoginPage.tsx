@@ -17,6 +17,7 @@ import {
   type OtpChannelOption,
 } from '@/lib/otp';
 import { normalizePhMobile, isValidPhMobile } from '@/lib/utils';
+import { useIsMobile } from '@/lib/useIsMobile';
 
 export default function LoginPage() {
   const { applySession, signOut } = useAuth();
@@ -24,6 +25,9 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const preselectedRole = searchParams.get('role') as UserRole | null;
   const isStaff = Boolean(preselectedRole) && preselectedRole !== 'user';
+  const isMobile = useIsMobile();
+  // On phones the compact role screen is the chooser; elsewhere the landing page.
+  const roleChooserTarget = isMobile ? '/roles' : '/';
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -227,7 +231,7 @@ export default function LoginPage() {
               <form onSubmit={handleContinue} className="space-y-4">
                 <div>
                   <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-1">
-                    {isStaff ? 'Staff ID' : 'Phone number'}
+                    {isStaff ? 'Staff Login ID' : 'Phone number'}
                   </label>
                   <div className="relative">
                     {isStaff
@@ -301,13 +305,13 @@ export default function LoginPage() {
 
         <p className="mt-5 text-center text-sm text-white/80 drop-shadow">
           {isStaff ? (
-            <>Not a staff member? <Link to="/register" className="text-white font-semibold hover:underline">Register as resident</Link></>
+            <>Not a staff member? <Link to="/login?role=user" className="text-white font-semibold hover:underline">Sign in as a Resident</Link></>
           ) : (
             <>Staff member? <Link to="/login?role=health_worker" className="text-white font-semibold hover:underline">Use staff login</Link></>
           )}
         </p>
         <p className="text-center text-sm text-white/70 drop-shadow mt-1">
-          <Link to="/" className="hover:underline">Choose a different role</Link>
+          <Link to={roleChooserTarget} className="hover:underline">Choose a different role</Link>
         </p>
 
         {canInstall && (

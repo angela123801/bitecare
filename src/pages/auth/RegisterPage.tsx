@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import type { Barangay } from '@/types';
 import { getErrorMessage, normalizePhMobile, isValidPhMobile } from '@/lib/utils';
+import { useIsMobile } from '@/lib/useIsMobile';
 import {
   Eye, EyeOff, Loader2, ChevronDown, AlertCircle, Lock,
   Phone, Mail, User as UserIcon, MapPin, CheckCircle2, Home,
@@ -22,6 +23,9 @@ type Step = 'form' | 'otp' | 'done';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  // On phones the compact role screen is the chooser; elsewhere the landing page.
+  const roleChooserTarget = isMobile ? '/roles' : '/';
 
   const [step, setStep] = useState<Step>('form');
   const [form, setForm] = useState({
@@ -347,7 +351,7 @@ export default function RegisterPage() {
           <Link to="/login" className="text-white font-semibold hover:underline">Sign in</Link>
         </p>
         <p className="text-center text-sm text-white/70 drop-shadow mt-1">
-          <Link to="/" className="hover:underline">Choose a different role</Link>
+          <Link to={roleChooserTarget} className="hover:underline">Choose a different role</Link>
         </p>
       </div>
     </div>

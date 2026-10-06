@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import type { UserRole } from '@/types';
+import { useIsMobile } from '@/lib/useIsMobile';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -11,6 +12,7 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children, minRole }: ProtectedRouteProps) {
   const { user, profile, loading, profileLoading, isRoleAtLeast } = useAuth();
   const location = useLocation();
+  const isMobile = useIsMobile();
 
   if (loading || (user && !profile && profileLoading)) {
     return (
@@ -24,7 +26,9 @@ export function ProtectedRoute({ children, minRole }: ProtectedRouteProps) {
   }
 
   if (!user || !profile) {
-    return <Navigate to="/" state={{ from: location }} replace />;
+    // Phones open on resident registration, so the role chooser is the correct
+    // place to land after a refresh or a lost session.
+    return <Navigate to={isMobile ? '/roles' : '/'} state={{ from: location }} replace />;
   }
 
   if (!profile.is_active) {
