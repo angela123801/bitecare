@@ -137,25 +137,39 @@ async function textbeeDeliveryFailed(batchId: string | undefined): Promise<boole
 }
 
 /**
- * A pinned phone can be removed or re-paired, which leaves its saved id
- * pointing at nothing and makes every send fail. Confirm the id still resolves
- * and otherwise let TextBee fall back to the account's default phone, so a
- * stale id degrades to a working gateway instead of no codes at all.
+ * The phone a code is sent from. A pinned phone can be removed or re-paired,
+ * which leaves its saved id pointing at nothing, so the id is confirmed against
+ * the account and otherwise resolved from the account's own device list —
+ * preferring the default phone, then any enabled one. A stale saved id then
+ * degrades to a working gateway instead of no codes at all.
  */
 async function resolveTextbeeDeviceId(): Promise<string | undefined> {
-  if (!TEXTBEE_DEVICE_ID) return undefined;
+  if (TEXTBEE_DEVICE_ID) {
+    try {
+      const res = await fetch(`https://api.textbee.dev/api/v1/gateway/devices/${TEXTBEE_DEVICE_ID}`, {
+        headers: { 'x-api-key': TEXTBEE_API_KEY! },
+      });
+      if (res.ok) return TEXTBEE_DEVICE_ID;
+      if (res.status !== 404) return TEXTBEE_DEVICE_ID;
+      console.error('[otp] pinned textbee device was not found; resolving the account default');
+    } catch {
+      return TEXTBEE_DEVICE_ID;
+    }
+  }
+
   try {
-    const res = await fetch(`https://api.textbee.dev/api/v1/gateway/devices/${TEXTBEE_DEVICE_ID}`, {
+    const res = await fetch('https://api.textbee.dev/api/v1/gateway/devices', {
       headers: { 'x-api-key': TEXTBEE_API_KEY! },
     });
-    if (res.ok) return TEXTBEE_DEVICE_ID;
-    if (res.status === 404) {
-      console.error('[otp] pinned textbee device was not found; falling back to the default device');
-      return undefined;
-    }
-    return TEXTBEE_DEVICE_ID;
+    if (!res.ok) return undefined;
+    const body = await res.json().catch(() => null);
+    const devices = Array.isArray(body?.data) ? (body.data as Record<string, unknown>[]) : [];
+    const enabled = devices.filter((d) => d.enabled !== false);
+    const chosen = enabled.find((d) => d.isDefault === true) ?? enabled[0];
+    const id = chosen?._id;
+    return typeof id === 'string' && id ? id : undefined;
   } catch {
-    return TEXTBEE_DEVICE_ID;
+    return undefined;
   }
 }
 
