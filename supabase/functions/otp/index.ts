@@ -10,9 +10,15 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-// SMS providers. TextBee is the free default: it sends through an Android
-// phone paired with the account, so it costs nothing per message. Semaphore,
-// Twilio and Vonage remain as fallbacks. The first configured one is used.
+// SMS providers. SMS Gateway for Android (sms-gate.app) and TextBee are the
+// free options: each sends through an Android phone you own, so there is no
+// per-message fee. Semaphore, Twilio and Vonage remain as paid fallbacks.
+// The first configured provider is used, and the rest are tried in turn if it
+// rejects the message, so one dead gateway cannot block sign-in.
+const SMSGATE_URL = (Deno.env.get('SMSGATE_URL') || 'https://api.sms-gate.app').replace(/\/+$/, '');
+const SMSGATE_USERNAME = Deno.env.get('SMSGATE_USERNAME');
+const SMSGATE_PASSWORD = Deno.env.get('SMSGATE_PASSWORD');
+const SMSGATE_DEVICE_ID = Deno.env.get('SMSGATE_DEVICE_ID');
 const TEXTBEE_API_KEY = Deno.env.get('TEXTBEE_API_KEY');
 const TEXTBEE_DEVICE_ID = Deno.env.get('TEXTBEE_DEVICE_ID');
 const SEMAPHORE_API_KEY = Deno.env.get('SEMAPHORE_API_KEY');
@@ -56,7 +62,7 @@ function toInternationalPh(phone: string): string {
   return `+63${digits}`;
 }
 
-type SmsProvider = 'textbee' | 'semaphore' | 'twilio' | 'vonage';
+type SmsProvider = 'smsgate' | 'textbee' | 'semaphore' | 'twilio' | 'vonage';
 
 /**
  * The outcome of a single gateway call. `messageId` is the gateway's own
@@ -79,6 +85,7 @@ function textbeeMessageId(result: unknown): string | undefined {
 /** Every configured provider, in the order they should be tried. */
 function smsProviderChain(): SmsProvider[] {
   const chain: SmsProvider[] = [];
+  if (SMSGATE_USERNAME && SMSGATE_PASSWORD) chain.push('smsgate');
   if (TEXTBEE_API_KEY) chain.push('textbee');
   if (SEMAPHORE_API_KEY) chain.push('semaphore');
   if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_FROM) chain.push('twilio');
@@ -131,6 +138,32 @@ async function textbeeDeliveryFailed(): Promise<boolean> {
 }
 
 async function sendViaProvider(provider: SmsProvider, to: string, text: string): Promise<SmsResult> {
+  if (provider === 'smsgate') {
+    const query = new URLSearchParams({ skipPhoneValidation: 'true' });
+    // With no pinned phone the server picks the most recently active device,
+    // so tell it to ignore phones that have not checked in for half a day.
+    if (!SMSGATE_DEVICE_ID) query.set('deviceActiveWithin', '12');
+    const res = await fetch(`${SMSGATE_URL}/3rdparty/v1/messages?${query}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Basic ${btoa(`${SMSGATE_USERNAME}:${SMSGATE_PASSWORD}`)}`,
+      },
+      body: JSON.stringify({
+        textMessage: { text },
+        phoneNumbers: [toInternationalPh(to)],
+        ...(SMSGATE_DEVICE_ID ? { deviceId: SMSGATE_DEVICE_ID } : {}),
+      }),
+    });
+    if (!res.ok) return { ok: false };
+    const data = await res.json().catch(() => null);
+    // The server answers 202 with the queued message, whose `id` is what
+    // delivery can be traced by later.
+    const created = Array.isArray(data) ? data[0] : data;
+    const id = created?.id ?? created?.messageId;
+    return { ok: true, messageId: typeof id === 'string' ? id : undefined };
+  }
+
   if (provider === 'textbee') {
     const res = await fetch('https://api.textbee.dev/api/v1/gateway/send-sms', {
       method: 'POST',
