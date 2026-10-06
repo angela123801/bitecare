@@ -5,8 +5,7 @@ import { ROLE_LABELS } from '@/config/constants';
 import { ROLE_MISMATCH_MESSAGE } from '@/lib/navigation';
 import { Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, Phone, IdCard } from 'lucide-react';
 import type { UserRole } from '@/types';
-import { useInstallApp } from '@/lib/installPrompt';
-import { Download, Smartphone } from 'lucide-react';
+import InstallAppButton from '@/components/auth/InstallAppButton';
 import OtpPanel from '@/components/auth/OtpPanel';
 import {
   sendOtp,
@@ -46,14 +45,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
-
-  const { canInstall, install, installing, platform } = useInstallApp();
-  const [showIosHelp, setShowIosHelp] = useState(false);
-
-  const handleInstall = async () => {
-    if (platform === 'ios') { setShowIosHelp(true); return; }
-    await install();
-  };
 
   // Clear transient messages when moving between steps.
   useEffect(() => {
@@ -314,20 +305,9 @@ export default function LoginPage() {
           <Link to={roleChooserTarget} className="hover:underline">Choose a different role</Link>
         </p>
 
-        {canInstall && (
-          <div className="mt-4 flex flex-col items-center gap-2">
-            <button type="button" onClick={handleInstall} disabled={installing} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-medium border border-white/25 transition-colors disabled:opacity-60">
-              {installing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              Install app on this device
-            </button>
-            {showIosHelp && (
-              <p className="flex items-start gap-2 max-w-xs text-xs text-white/85 text-left bg-black/35 backdrop-blur-sm rounded-lg p-3">
-                <Smartphone className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>Tap Share, then Add to Home Screen.</span>
-              </p>
-            )}
-          </div>
-        )}
+        <div className="mt-4 flex justify-center">
+          <InstallAppButton />
+        </div>
       </div>
     </div>
   );

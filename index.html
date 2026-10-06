@@ -9,6 +9,22 @@
     <title>BiteCare: A Mobile &amp; Web Application Animal Bite Management for Monitoring System &amp; Decision Support System</title>
     <meta name="description" content="BiteCare: A Mobile &amp; Web Application Animal Bite Management for Monitoring System &amp; Decision Support System" />
     <meta name="theme-color" content="#0f766e" />
+    <script>
+      // Capture the browser's install prompt as early as possible. The prompt
+      // fires once, shortly after load, so a listener attached later inside the
+      // app would miss it and the install button would never appear.
+      window.__bitecareInstallPrompt = null;
+      window.__bitecareInstallListeners = new Set();
+      window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        window.__bitecareInstallPrompt = event;
+        window.__bitecareInstallListeners.forEach(function (listener) { listener(true); });
+      });
+      window.addEventListener('appinstalled', function () {
+        window.__bitecareInstallPrompt = null;
+        window.__bitecareInstallListeners.forEach(function (listener) { listener(false); });
+      });
+    </script>
     <meta property="og:image" content="/logo.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="/logo.png">

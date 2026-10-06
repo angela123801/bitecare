@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Stethoscope, User, IdCard } from 'lucide-react';
-import { useInstallApp } from '@/lib/installPrompt';
+import InstallAppButton from '@/components/auth/InstallAppButton';
 
 /**
  * The phone-sized role chooser. Only Resident/User and Health Worker/Staff are
@@ -10,7 +10,6 @@ import { useInstallApp } from '@/lib/installPrompt';
  */
 export default function MobileRoleSelectionPage() {
   const navigate = useNavigate();
-  const { canInstall, install, installing } = useInstallApp();
 
   return (
     <div
@@ -84,18 +83,9 @@ export default function MobileRoleSelectionPage() {
           </button>
         </div>
 
-        {canInstall && (
-          <div className="mt-4 flex justify-center">
-            <button
-              type="button"
-              onClick={() => install()}
-              disabled={installing}
-              className="text-white/70 hover:text-white text-xs font-medium underline transition-colors disabled:opacity-60"
-            >
-              {installing ? 'Installing...' : 'Install app on this device'}
-            </button>
-          </div>
-        )}
+        <div className="mt-4 flex justify-center">
+          <InstallAppButton />
+        </div>
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import {
   Phone, Mail, User as UserIcon, MapPin, CheckCircle2, Home,
 } from 'lucide-react';
 import OtpPanel from '@/components/auth/OtpPanel';
+import InstallAppButton from '@/components/auth/InstallAppButton';
 import {
   sendOtp,
   verifyOtp,
@@ -353,6 +354,10 @@ export default function RegisterPage() {
         <p className="text-center text-sm text-white/70 drop-shadow mt-1">
           <Link to={roleChooserTarget} className="hover:underline">Choose a different role</Link>
         </p>
+
+        <div className="mt-4 flex justify-center">
+          <InstallAppButton />
+        </div>
       </div>
     </div>
   );

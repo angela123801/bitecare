@@ -30,7 +30,7 @@ export default function TopBar({ onMenuClick, unreadCount }: TopBarProps) {
   const [avatarUrl, setAvatarUrl] = useState('');
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const { canInstall, install, installing, platform } = useInstallApp();
+  const { canInstall, install, installing, platform, needsManualSteps } = useInstallApp();
 
   useEffect(() => {
     let active = true;
@@ -55,8 +55,9 @@ export default function TopBar({ onMenuClick, unreadCount }: TopBarProps) {
   }, []);
 
   const handleInstall = async () => {
-    // iPhone and iPad expose no install prompt, so show the manual steps.
-    if (platform === 'ios') {
+    // iPhone and iPad expose no install prompt, and some browsers never fire
+    // one, so show the manual steps instead of a button that does nothing.
+    if (needsManualSteps) {
       setShowInstallHelp(true);
       return;
     }
@@ -113,11 +114,19 @@ export default function TopBar({ onMenuClick, unreadCount }: TopBarProps) {
                   <Smartphone className="w-5 h-5 text-primary-600" />
                   <p className="font-semibold text-gray-900 text-sm">Add BiteCare to your phone</p>
                 </div>
-                <ol className="text-sm text-gray-600 space-y-1.5 list-decimal list-inside">
-                  <li>Tap the Share button in Safari.</li>
-                  <li>Scroll down and tap Add to Home Screen.</li>
-                  <li>Tap Add. The BiteCare icon appears on your home screen.</li>
-                </ol>
+                {platform === 'ios' ? (
+                  <ol className="text-sm text-gray-600 space-y-1.5 list-decimal list-inside">
+                    <li>Tap the Share button in Safari.</li>
+                    <li>Scroll down and tap Add to Home Screen.</li>
+                    <li>Tap Add. The BiteCare icon appears on your home screen.</li>
+                  </ol>
+                ) : (
+                  <ol className="text-sm text-gray-600 space-y-1.5 list-decimal list-inside">
+                    <li>Open your browser menu (the three dots).</li>
+                    <li>Tap Install app or Add to Home screen.</li>
+                    <li>Confirm. The BiteCare icon appears on your home screen.</li>
+                  </ol>
+                )}
               </div>
             )}
           </div>
