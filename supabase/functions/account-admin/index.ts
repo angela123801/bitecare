@@ -15,6 +15,24 @@ const TEXTBEE_DEVICE_ID = Deno.env.get('TEXTBEE_DEVICE_ID');
 const SEMAPHORE_API_KEY = Deno.env.get('SEMAPHORE_API_KEY');
 const SEMAPHORE_SENDER = Deno.env.get('SEMAPHORE_SENDER_NAME');
 
+/**
+ * The outcome of a single gateway call. `messageId` is the gateway's own
+ * message/batch id, kept so delivery can be traced after the fact.
+ */
+interface SmsResult {
+  ok: boolean;
+  messageId?: string;
+}
+
+/** Pull the gateway's message/batch id out of a TextBee response. */
+function textbeeMessageId(result: unknown): string | undefined {
+  if (!result || typeof result !== 'object') return undefined;
+  const r = result as Record<string, unknown>;
+  const candidates = [r.messageId, r.batchId, r.batch_id, r.id];
+  const found = candidates.find((v) => typeof v === 'string' && v.length > 0);
+  return found as string | undefined;
+}
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -53,7 +71,7 @@ function toInternationalPh(phone: string): string {
  * the phone accepts a message with HTTP 200 and only then fails the FCM push,
  * so a 200 alone does not prove delivery when a fallback exists.
  */
-async function sendOtpSms(phone: string, code: string): Promise<boolean> {
+async function sendOtpSms(phone: string, code: string): Promise<SmsResult> {
   const text = `Your BiteCare verification code is ${code}. Use it to verify the new account. It expires in 5 minutes. Never share this code.`;
   const hasFallback = Boolean(SEMAPHORE_API_KEY);
 
@@ -70,8 +88,10 @@ async function sendOtpSms(phone: string, code: string): Promise<boolean> {
       });
       if (res.ok) {
         const data = await res.json().catch(() => null);
-        if (data?.data?.success !== false) {
-          if (!hasFallback) return true;
+        const result = data?.data;
+        if (result?.success !== false) {
+          const messageId = textbeeMessageId(result);
+          if (!hasFallback) return { ok: true, messageId };
           await new Promise((resolve) => setTimeout(resolve, 700));
           const statusRes = await fetch(
             `https://api.textbee.dev/api/v1/gateway/devices/${TEXTBEE_DEVICE_ID}/messages?limit=1`,
@@ -79,9 +99,9 @@ async function sendOtpSms(phone: string, code: string): Promise<boolean> {
           );
           if (statusRes.ok) {
             const statusData = await statusRes.json().catch(() => null);
-            if (statusData?.data?.[0]?.status !== 'failed') return true;
+            if (statusData?.data?.[0]?.status !== 'failed') return { ok: true, messageId };
           } else {
-            return true;
+            return { ok: true, messageId };
           }
         }
       }
@@ -102,16 +122,17 @@ async function sendOtpSms(phone: string, code: string): Promise<boolean> {
           ...(SEMAPHORE_SENDER ? { sendername: SEMAPHORE_SENDER } : {}),
         }),
       });
-      if (!res.ok) return false;
+      if (!res.ok) return { ok: false };
       const data = await res.json().catch(() => null);
-      if (Array.isArray(data) && data[0]?.status === 'failed') return false;
-      return true;
+      if (Array.isArray(data) && data[0]?.status === 'failed') return { ok: false };
+      const id = Array.isArray(data) ? (data[0]?.message_id ?? data[0]?.messageId) : undefined;
+      return { ok: true, messageId: typeof id === 'string' ? id : undefined };
     } catch {
-      return false;
+      return { ok: false };
     }
   }
 
-  return false;
+  return { ok: false };
 }
 
 Deno.serve(async (req: Request) => {
@@ -240,6 +261,7 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
 
       let otpSent = false;
+      let providerMessageId: string | undefined;
 
       if (verificationRequired) {
         const { data: otpData, error: otpErr } = await adminClient.rpc('generate_verification_otp', {
@@ -247,7 +269,9 @@ Deno.serve(async (req: Request) => {
         });
         if (otpErr) return json({ error: otpErr.message }, 500);
         const code = (otpData as { otp: string }).otp;
-        otpSent = await sendOtpSms(phone ?? '', code);
+        const delivery = await sendOtpSms(phone ?? '', code);
+        otpSent = delivery.ok;
+        providerMessageId = delivery.messageId;
       } else {
         // No verification step at all: activate the account now.
         await adminClient.rpc('mark_account_verified', { p_user_id: newUserId });
@@ -271,8 +295,18 @@ Deno.serve(async (req: Request) => {
           verification_required: verificationRequired,
           provisioning_mode: isSuperAdmin ? 'super_admin_exempt' : 'standard',
           otp_sent: otpSent,
+          provider_message_id: providerMessageId ?? null,
         },
       });
+
+      // Trace the gateway's message/batch id. The code itself is never logged,
+      // and the number is masked.
+      if (otpSent && providerMessageId) {
+        console.log('[account-admin] sms dispatched', {
+          to: maskPhone(phone ?? ''),
+          provider_message_id: providerMessageId,
+        });
+      }
 
       // The verification code is NEVER returned to the client. When the email
       // could not be sent we say so plainly instead of pretending it was.
@@ -314,9 +348,23 @@ Deno.serve(async (req: Request) => {
       if (otpErr) return json({ error: otpErr.message }, 400);
 
       const code = (otpData as { otp: string }).otp;
-      const otpSent = await sendOtpSms(target.phone ?? '', code);
+      const delivery = await sendOtpSms(target.phone ?? '', code);
 
-      return json({ ok: true, otp_sent: otpSent, destination_masked: maskPhone(target.phone ?? '') });
+      if (delivery.ok && delivery.messageId) {
+        console.log('[account-admin] sms dispatched', {
+          to: maskPhone(target.phone ?? ''),
+          provider_message_id: delivery.messageId,
+        });
+        await adminClient.from('audit_logs').insert({
+          actor_id: user.id,
+          action: 'otp_dispatched',
+          entity_type: 'account',
+          entity_id: userId,
+          new_values: { purpose: 'verification', provider_message_id: delivery.messageId },
+        });
+      }
+
+      return json({ ok: true, otp_sent: delivery.ok, destination_masked: maskPhone(target.phone ?? '') });
     }
 
     // ---------- Verify code ----------

@@ -58,6 +58,24 @@ function toInternationalPh(phone: string): string {
 
 type SmsProvider = 'textbee' | 'semaphore' | 'twilio' | 'vonage';
 
+/**
+ * The outcome of a single gateway call. `messageId` is the gateway's own
+ * message/batch id, kept so delivery can be traced after the fact.
+ */
+interface SmsResult {
+  ok: boolean;
+  messageId?: string;
+}
+
+/** Pull the gateway's message/batch id out of a provider response. */
+function textbeeMessageId(result: unknown): string | undefined {
+  if (!result || typeof result !== 'object') return undefined;
+  const r = result as Record<string, unknown>;
+  const candidates = [r.messageId, r.batchId, r.batch_id, r.id];
+  const found = candidates.find((v) => typeof v === 'string' && v.length > 0);
+  return found as string | undefined;
+}
+
 /** Every configured provider, in the order they should be tried. */
 function smsProviderChain(): SmsProvider[] {
   const chain: SmsProvider[] = [];
@@ -112,7 +130,7 @@ async function textbeeDeliveryFailed(): Promise<boolean> {
   }
 }
 
-async function sendViaProvider(provider: SmsProvider, to: string, text: string): Promise<boolean> {
+async function sendViaProvider(provider: SmsProvider, to: string, text: string): Promise<SmsResult> {
   if (provider === 'textbee') {
     const res = await fetch('https://api.textbee.dev/api/v1/gateway/send-sms', {
       method: 'POST',
@@ -123,16 +141,16 @@ async function sendViaProvider(provider: SmsProvider, to: string, text: string):
         ...(TEXTBEE_DEVICE_ID ? { deviceId: TEXTBEE_DEVICE_ID } : {}),
       }),
     });
-    if (!res.ok) return false;
+    if (!res.ok) return { ok: false };
     const data = await res.json().catch(() => null);
     const result = data?.data;
     // `success` covers queued batches; `failureCount`/`warning` cover immediate
     // dispatch. Either one failing means the code was not pushed to the phone.
-    if (result?.success === false) return false;
-    if (typeof result?.failureCount === 'number' && result.failureCount > 0) return false;
-    if (result?.warning) return false;
-    if (smsProviderChain().length > 1 && await textbeeDeliveryFailed()) return false;
-    return true;
+    if (result?.success === false) return { ok: false };
+    if (typeof result?.failureCount === 'number' && result.failureCount > 0) return { ok: false };
+    if (result?.warning) return { ok: false };
+    if (smsProviderChain().length > 1 && await textbeeDeliveryFailed()) return { ok: false };
+    return { ok: true, messageId: textbeeMessageId(result) };
   }
 
   if (provider === 'semaphore') {
@@ -146,12 +164,14 @@ async function sendViaProvider(provider: SmsProvider, to: string, text: string):
         ...(SEMAPHORE_SENDER ? { sendername: SEMAPHORE_SENDER } : {}),
       }),
     });
-    if (!res.ok) return false;
+    if (!res.ok) return { ok: false };
     const data = await res.json().catch(() => null);
     // Semaphore answers 200 even when the send is refused; the body carries the
     // real outcome, so treat a rejected entry as a failure and fall through.
-    if (Array.isArray(data) && data[0]?.status === 'failed') return false;
-    return true;
+    if (Array.isArray(data) && data[0]?.status === 'failed') return { ok: false };
+    const first = Array.isArray(data) ? data[0] : null;
+    const id = first?.message_id ?? first?.messageId;
+    return { ok: true, messageId: typeof id === 'string' ? id : undefined };
   }
 
   if (provider === 'twilio') {
@@ -167,7 +187,9 @@ async function sendViaProvider(provider: SmsProvider, to: string, text: string):
         body,
       },
     );
-    return res.ok;
+    if (!res.ok) return { ok: false };
+    const data = await res.json().catch(() => null);
+    return { ok: true, messageId: typeof data?.sid === 'string' ? data.sid : undefined };
   }
 
   const res = await fetch('https://rest.nexmo.com/sms/json', {
@@ -181,9 +203,11 @@ async function sendViaProvider(provider: SmsProvider, to: string, text: string):
       text,
     }),
   });
-  if (!res.ok) return false;
+  if (!res.ok) return { ok: false };
   const data = await res.json().catch(() => null);
-  return data?.messages?.[0]?.status === '0';
+  const msg = data?.messages?.[0];
+  const id = msg?.['message-id'] ?? msg?.messageId;
+  return { ok: msg?.status === '0', messageId: typeof id === 'string' ? id : undefined };
 }
 
 /**
@@ -191,20 +215,21 @@ async function sendViaProvider(provider: SmsProvider, to: string, text: string):
  * accept the message wins; if one fails we move to the next so a single dead
  * gateway cannot stop residents from signing in.
  */
-async function sendSms(to: string, purpose: Purpose, code: string): Promise<boolean> {
+async function sendSms(to: string, purpose: Purpose, code: string): Promise<SmsResult> {
   const text = otpMessage(purpose, code);
   for (const provider of smsProviderChain()) {
     try {
-      if (await sendViaProvider(provider, to, text)) return true;
+      const result = await sendViaProvider(provider, to, text);
+      if (result.ok) return result;
     } catch {
       // Try the next provider.
     }
   }
-  return false;
+  return { ok: false };
 }
 
-async function deliver(channel: Channel, to: string, purpose: Purpose, code: string): Promise<boolean> {
-  return channel === 'sms' ? sendSms(to, purpose, code) : false;
+async function deliver(channel: Channel, to: string, purpose: Purpose, code: string): Promise<SmsResult> {
+  return channel === 'sms' ? sendSms(to, purpose, code) : { ok: false };
 }
 
 interface ChallengeResult {
@@ -419,7 +444,25 @@ Deno.serve(async (req: Request) => {
       const destination = String(challenge.destination);
 
       const configured = providerConfigured(channel);
-      const delivered = configured ? await deliver(channel, destination, purpose, code) : false;
+      const delivery: SmsResult = configured
+        ? await deliver(channel, destination, purpose, code)
+        : { ok: false };
+
+      // Record the gateway's message/batch id so delivery can be traced later.
+      // The code itself is never written here, and the number is masked.
+      if (delivery.ok && delivery.messageId) {
+        console.log('[otp] sms dispatched', {
+          purpose,
+          to: maskPhone(destination),
+          provider_message_id: delivery.messageId,
+        });
+        await adminClient.from('audit_logs').insert({
+          action: 'otp_dispatched',
+          entity_type: 'account',
+          entity_id: userId,
+          new_values: { purpose, channel, provider_message_id: delivery.messageId },
+        });
+      }
 
       // The code is never returned. When no provider is configured we say so
       // plainly instead of pretending the message was sent.
@@ -427,7 +470,7 @@ Deno.serve(async (req: Request) => {
         ok: true,
         channel,
         destination_masked: maskPhone(destination),
-        delivered,
+        delivered: delivery.ok,
         provider_configured: configured,
         expires_in: Number(challenge.expires_in ?? 300),
         resend_in: Number(challenge.resend_in ?? 60),
