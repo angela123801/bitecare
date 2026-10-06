@@ -25,6 +25,29 @@ interface SmsResult {
   messageId?: string;
 }
 
+/**
+ * A pinned phone can be removed or re-paired, which leaves its saved id
+ * pointing at nothing and makes every send fail. Confirm the id still resolves
+ * and otherwise let TextBee fall back to the account's default phone, so a
+ * stale id degrades to a working gateway instead of no codes at all.
+ */
+async function resolveTextbeeDeviceId(): Promise<string | undefined> {
+  if (!TEXTBEE_DEVICE_ID) return undefined;
+  try {
+    const res = await fetch(`https://api.textbee.dev/api/v1/gateway/devices/${TEXTBEE_DEVICE_ID}`, {
+      headers: { 'x-api-key': TEXTBEE_API_KEY! },
+    });
+    if (res.ok) return TEXTBEE_DEVICE_ID;
+    if (res.status === 404) {
+      console.error('[account-admin] pinned textbee device was not found; falling back to the default device');
+      return undefined;
+    }
+    return TEXTBEE_DEVICE_ID;
+  } catch {
+    return TEXTBEE_DEVICE_ID;
+  }
+}
+
 /** Pull the gateway's message/batch id out of a TextBee response. */
 function textbeeMessageId(result: unknown): string | undefined {
   if (!result || typeof result !== 'object') return undefined;
@@ -79,13 +102,14 @@ async function sendOtpSms(phone: string, code: string): Promise<SmsResult> {
 
   if (TEXTBEE_API_KEY) {
     try {
+      const deviceId = await resolveTextbeeDeviceId();
       const res = await fetch('https://api.textbee.dev/api/v1/gateway/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': TEXTBEE_API_KEY },
         body: JSON.stringify({
           recipients: [toInternationalPh(phone)],
           message: text,
-          ...(TEXTBEE_DEVICE_ID ? { deviceId: TEXTBEE_DEVICE_ID } : {}),
+          ...(deviceId ? { deviceId } : {}),
           ...(simId !== null && Number.isFinite(simId) ? { simSubscriptionId: simId } : {}),
         }),
       });
@@ -102,7 +126,7 @@ async function sendOtpSms(phone: string, code: string): Promise<SmsResult> {
         const result = data?.data;
         if (result?.success !== false) {
           const messageId = textbeeMessageId(result);
-          if (!hasFallback || !TEXTBEE_DEVICE_ID || !messageId) return { ok: true, messageId };
+          if (!hasFallback || !deviceId || !messageId) return { ok: true, messageId };
           await new Promise((resolve) => setTimeout(resolve, 700));
           const query = new URLSearchParams({ smsBatchId: messageId, limit: '1' });
           const statusRes = await fetch(
