@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import type { UserRole } from '@/types';
 
 export type OtpChannel = 'email' | 'sms';
 export type OtpPurpose = 'login' | 'verification' | 'password_recovery' | 'contact_change';
@@ -7,12 +6,6 @@ export type OtpPurpose = 'login' | 'verification' | 'password_recovery' | 'conta
 export interface OtpChannelOption {
   channel: OtpChannel;
   destination_masked: string;
-}
-
-export interface OtpChannelsResult {
-  ok: true;
-  role: UserRole;
-  channels: OtpChannelOption[];
 }
 
 export interface OtpSendResult {
@@ -71,7 +64,21 @@ export function otpDeliveryMessage(
   return `We couldn't send the ${label} code right now. Please try again in a moment.`;
 }
 
-async function call<T>(body: Record<string, unknown>): Promise<T> {
+// Coalesce identical requests that are already in flight, so a double tap or an
+// impatient second press cannot fire two codes or two session exchanges.
+const inFlight = new Map<string, Promise<unknown>>();
+
+function call<T>(body: Record<string, unknown>): Promise<T> {
+  const key = JSON.stringify(body);
+  const existing = inFlight.get(key);
+  if (existing) return existing as Promise<T>;
+
+  const promise = request<T>(body).finally(() => { inFlight.delete(key); });
+  inFlight.set(key, promise);
+  return promise;
+}
+
+async function request<T>(body: Record<string, unknown>): Promise<T> {
   const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/otp`;
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -113,12 +120,6 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
     );
   }
   return data as T;
-}
-
-/** Which verification methods this sign-in ID may use, with masked destinations.
- *  Omit the identifier to use the signed-in caller's own account. */
-export function fetchOtpChannels(identifier?: string): Promise<OtpChannelsResult> {
-  return call<OtpChannelsResult>({ action: 'channels', identifier: identifier ?? '' });
 }
 
 export function sendOtp(input: {

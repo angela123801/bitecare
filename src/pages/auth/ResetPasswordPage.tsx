@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Eye, EyeOff, Loader2, CheckCircle, AlertCircle, KeyRound, Phone } from 'lucide-react';
 import OtpPanel from '@/components/auth/OtpPanel';
 import {
-  fetchOtpChannels,
   sendOtp,
   verifyOtp,
   otpDeliveryMessage,
@@ -13,6 +12,7 @@ import {
   type OtpChannel,
   type OtpChannelOption,
 } from '@/lib/otp';
+import { normalizePhMobile } from '@/lib/utils';
 
 type Step = 'identify' | 'otp' | 'newPassword' | 'done';
 
@@ -41,8 +41,11 @@ export default function ResetPasswordPage() {
   const [resending, setResending] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // A staff ID is used as-is; a phone number is normalised to 09XXXXXXXXX.
+  const normalizedIdentifier = () => (/^BC-/i.test(identifier.trim()) ? identifier.trim() : normalizePhMobile(identifier));
+
   const sendCode = async (channel: OtpChannel) => {
-    const result = await sendOtp({ purpose: 'password_recovery', channel, identifier: identifier.trim() });
+    const result = await sendOtp({ purpose: 'password_recovery', channel, identifier: normalizedIdentifier() });
     setDestinationMasked(result.destination_masked);
     setExpiresIn(result.expires_in);
     setResendIn(result.resend_in);
@@ -55,17 +58,14 @@ export default function ResetPasswordPage() {
     setError('');
     if (!identifier.trim()) { setError('Enter your phone number or staff ID'); return; }
 
+    setIdentifier(normalizedIdentifier());
     setLoading(true);
     try {
-      const { channels: available } = await fetchOtpChannels(identifier.trim());
-      if (available.length === 0) {
-        setError('No verification method is available for this account.');
-        return;
-      }
-      setChannels(available);
-      const first = available[0].channel;
-      setSelectedChannel(first);
-      await sendCode(first);
+      // Send straight away: the server resolves the account and sends the SMS in
+      // one request, with no lookup round trip in between. SMS is the only method.
+      setChannels([]);
+      setSelectedChannel('sms');
+      await sendCode('sms');
       setStep('otp');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not start the reset');
@@ -108,7 +108,7 @@ export default function ResetPasswordPage() {
       const result = await verifyOtp({
         purpose: 'password_recovery',
         otp: code,
-        identifier: identifier.trim(),
+        identifier: normalizedIdentifier(),
       });
       if (!result.recovery_token || !result.email) {
         throw new OtpError('Could not start the password reset. Please try again.');

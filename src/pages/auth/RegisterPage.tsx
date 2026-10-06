@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import type { Barangay } from '@/types';
-import { getErrorMessage } from '@/lib/utils';
+import { getErrorMessage, normalizePhMobile, isValidPhMobile } from '@/lib/utils';
 import {
   Eye, EyeOff, Loader2, ChevronDown, AlertCircle, Lock,
   Phone, Mail, User as UserIcon, MapPin, CheckCircle2, Home,
@@ -81,6 +81,7 @@ export default function RegisterPage() {
   // --- Create account, then send the verification code ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
 
     if (!form.fullName.trim()) { setError('Full name is required'); return; }
@@ -88,12 +89,13 @@ export default function RegisterPage() {
     if (form.password.length < 6) { setError('Password must be at least 6 characters'); return; }
     if (form.password !== form.confirmPassword) { setError('Passwords do not match'); return; }
 
-    const normalizedPhone = form.phone.replace(/\D/g, '').replace(/^63/, '0');
-    if (!/^0\d{10}$/.test(normalizedPhone)) {
+    const normalizedPhone = normalizePhMobile(form.phone);
+    if (!isValidPhMobile(normalizedPhone)) {
       setError('A valid Philippine mobile number is required (for example 09171234567). Your verification code is sent by SMS.');
       return;
     }
 
+    setForm((f) => ({ ...f, phone: normalizedPhone }));
     setLoading(true);
     try {
       const { error: signUpError } = await supabase.auth.signUp({
@@ -105,7 +107,7 @@ export default function RegisterPage() {
 
       const { error: completeError } = await supabase.rpc('public_complete_registration', {
         p_full_name: form.fullName.trim(),
-        p_phone: form.phone.trim(),
+        p_phone: normalizedPhone,
         p_barangay_id: form.barangayId || null,
         p_address: form.address.trim(),
       });
@@ -161,6 +163,7 @@ export default function RegisterPage() {
   };
 
   const handleVerifyOtp = async (code: string) => {
+    if (verifying) return;
     setError(''); setOtpInfo('');
     setVerifying(true);
     try {

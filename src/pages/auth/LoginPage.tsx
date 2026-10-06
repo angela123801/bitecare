@@ -9,7 +9,6 @@ import { useInstallApp } from '@/lib/installPrompt';
 import { Download, Smartphone } from 'lucide-react';
 import OtpPanel from '@/components/auth/OtpPanel';
 import {
-  fetchOtpChannels,
   sendOtp,
   verifyOtp,
   otpDeliveryMessage,
@@ -17,6 +16,7 @@ import {
   type OtpChannel,
   type OtpChannelOption,
 } from '@/lib/otp';
+import { normalizePhMobile, isValidPhMobile } from '@/lib/utils';
 
 export default function LoginPage() {
   const { applySession, signOut } = useAuth();
@@ -57,11 +57,14 @@ export default function LoginPage() {
     setInfo('');
   }, [step]);
 
-  const sendCode = async (channel: OtpChannel, keepSelection: boolean) => {
+  // Residents sign in with their phone number, so normalise it before it is sent.
+  const normalizedIdentifier = () => (isStaff ? identifier.trim() : normalizePhMobile(identifier));
+
+  const sendCode = async (channel: OtpChannel, keepSelection: boolean, idOverride?: string) => {
     const result = await sendOtp({
       purpose: 'login',
       channel,
-      identifier: identifier.trim(),
+      identifier: idOverride ?? normalizedIdentifier(),
       password,
     });
     if (!keepSelection) setSelectedChannel(result.channel);
@@ -75,26 +78,30 @@ export default function LoginPage() {
 
   const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
-    if (!identifier.trim()) {
+
+    const id = normalizedIdentifier();
+    if (!id) {
       setError(isStaff ? 'Please enter your staff ID' : 'Please enter your phone number');
+      return;
+    }
+    if (!isStaff && !isValidPhMobile(id)) {
+      setError('Enter a valid Philippine mobile number (for example 09171234567).');
       return;
     }
     if (!password) { setError('Please enter your password'); return; }
 
+    setIdentifier(id);
     setLoading(true);
     try {
-      // Ask the server which methods this account may use. Residents get SMS
-      // only; the server enforces this regardless of what the UI shows.
-      const { channels: available } = await fetchOtpChannels(identifier.trim());
-      if (available.length === 0) {
-        setError('No verification method is available for this account. Contact an administrator.');
-        return;
-      }
-      setChannels(available);
-      const first = available[0].channel;
-      setSelectedChannel(first);
-      await sendCode(first, true);
+      // Send the code immediately. The server resolves the account, checks the
+      // password and sends the SMS in a single request, so there is no extra
+      // round trip before the message goes out. SMS is the only method, for
+      // every role, and the server enforces that regardless of the UI.
+      setChannels([]);
+      setSelectedChannel('sms');
+      await sendCode('sms', true, id);
       setStep('otp');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign in failed');
@@ -132,6 +139,7 @@ export default function LoginPage() {
   };
 
   const handleVerify = async (code: string) => {
+    if (verifying) return;
     setError('');
     setInfo('');
     setVerifying(true);
@@ -139,7 +147,7 @@ export default function LoginPage() {
       const result = await verifyOtp({
         purpose: 'login',
         otp: code,
-        identifier: identifier.trim(),
+        identifier: normalizedIdentifier(),
         password,
       });
       if (!result.access_token || !result.refresh_token) {

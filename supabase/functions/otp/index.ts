@@ -168,6 +168,66 @@ async function deliver(channel: Channel, to: string, purpose: Purpose, code: str
   return channel === 'sms' ? sendSms(to, purpose, code) : false;
 }
 
+interface ChallengeResult {
+  data: Record<string, unknown> | null;
+  error: string | null;
+}
+
+/**
+ * Create (or reissue) a verification challenge.
+ *
+ * Rapid re-taps are answered from an in-process cooldown map, so a second tap
+ * inside the resend window is rejected immediately instead of costing another
+ * database round trip and another SMS. Two identical requests that arrive
+ * together share a single in-flight call, so a double tap can never send two
+ * messages. The database's `otp_create_challenge` stays the authority for the
+ * cooldown and the hourly cap; this map is only a fast path in front of it.
+ */
+const challengeCache = new Map<string, { resendAvailableAt: number }>();
+const challengeInFlight = new Map<string, Promise<ChallengeResult>>();
+
+function createChallenge(
+  adminClient: ReturnType<typeof createClient>,
+  userId: string,
+  purpose: Purpose,
+  channel: Channel,
+  destination: string | null,
+  password: string | null = null,
+): Promise<ChallengeResult> {
+  const key = `${userId}:${purpose}`;
+  const now = Date.now();
+
+  const cached = challengeCache.get(key);
+  if (cached && cached.resendAvailableAt > now) {
+    const wait = Math.max(1, Math.ceil((cached.resendAvailableAt - now) / 1000));
+    return Promise.resolve({ data: null, error: `Please wait ${wait} seconds before requesting another code` });
+  }
+
+  const pending = challengeInFlight.get(key);
+  if (pending) return pending;
+
+  const call = adminClient
+    .rpc('otp_create_challenge', {
+      p_user_id: userId,
+      p_purpose: purpose,
+      p_channel: channel,
+      p_destination: destination,
+      p_password: password,
+    })
+    .then(({ data, error }): ChallengeResult => {
+      if (error) return { data: null, error: error.message };
+      const created = data as Record<string, unknown>;
+      challengeCache.set(key, {
+        resendAvailableAt: now + Number(created.resend_in ?? 60) * 1000,
+      });
+      return { data: created, error: null };
+    })
+    .finally(() => { challengeInFlight.delete(key); });
+
+  challengeInFlight.set(key, call);
+  return call;
+}
+
 /** Resolve a signed-in caller from the Authorization header, if present. */
 async function getCaller(req: Request) {
   const authHeader = req.headers.get('Authorization');
@@ -246,11 +306,12 @@ Deno.serve(async (req: Request) => {
       if (channel !== 'sms') return json({ error: 'SMS is the only verification method' }, 400);
 
       let userId: string | null = null;
+      let loginPassword: string | null = null;
       let newPhone = '';
 
       if (purpose === 'login') {
-        // Password is verified here and the session is discarded: the OTP is
-        // what actually completes the sign-in.
+        // Resolve the account here; the password is verified inside the same
+        // create call, so sending a code is a single server round trip.
         const identifier = String(body.identifier ?? '').trim();
         const password = String(body.password ?? '');
         if (!identifier || !password) return json({ error: 'Enter your sign-in ID and password' }, 400);
@@ -263,10 +324,8 @@ Deno.serve(async (req: Request) => {
           return json({ error: 'This account is deactivated. Contact an administrator.' }, 403);
         }
 
-        const session = await checkPassword(String(resolved.email), password);
-        if (!session) return json({ error: 'Invalid sign-in ID or password' }, 401);
-
         userId = String(resolved.id);
+        loginPassword = password;
       } else if (purpose === 'password_recovery') {
         // The user cannot sign in, so identity is proven by the OTP itself.
         // Respond identically whether or not the account exists, so this
@@ -302,17 +361,23 @@ Deno.serve(async (req: Request) => {
 
       if (!userId) return json({ error: 'Invalid request' }, 400);
 
-      const { data: challenge, error: challengeErr } = await adminClient.rpc('otp_create_challenge', {
-        p_user_id: userId,
-        p_purpose: purpose,
-        p_channel: channel,
-        p_destination: purpose === 'contact_change' ? newPhone : null,
-      });
-      if (challengeErr) return json({ error: challengeErr.message }, 400);
+      const { data: challenge, error: challengeErr } = await createChallenge(
+        adminClient,
+        userId,
+        purpose,
+        channel,
+        purpose === 'contact_change' ? newPhone : null,
+        loginPassword,
+      );
+      if (challengeErr || !challenge) {
+        const message = challengeErr ?? 'Could not create a code';
+        // A failed password check must not reveal whether the account exists.
+        const status = message.includes('Invalid sign-in ID or password') ? 401 : 400;
+        return json({ error: message }, status);
+      }
 
-      const created = challenge as Record<string, unknown>;
-      const code = String(created.otp);
-      const destination = String(created.destination);
+      const code = String(challenge.otp);
+      const destination = String(challenge.destination);
 
       const configured = providerConfigured(channel);
       const delivered = configured ? await deliver(channel, destination, purpose, code) : false;
@@ -325,8 +390,8 @@ Deno.serve(async (req: Request) => {
         destination_masked: maskPhone(destination),
         delivered,
         provider_configured: configured,
-        expires_in: Number(created.expires_in ?? 300),
-        resend_in: Number(created.resend_in ?? 60),
+        expires_in: Number(challenge.expires_in ?? 300),
+        resend_in: Number(challenge.resend_in ?? 60),
       });
     }
 

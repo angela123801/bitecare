@@ -2,6 +2,24 @@ export function cn(...classes: (string | boolean | undefined | null)[]): string 
   return classes.filter(Boolean).join(' ');
 }
 
+/**
+ * Reduce a Philippine mobile number to its canonical 09XXXXXXXXX form.
+ * Accepts +63 9XX, 63 9XX, 09XX, 9XX (with or without spaces, dashes or
+ * parentheses) so the same number is always recognised as one account.
+ */
+export function normalizePhMobile(input: string): string {
+  const trimmed = (input ?? '').trim();
+  const withoutPrefix = /^\+?63/.test(trimmed) ? '0' + trimmed.replace(/^\+?63/, '') : trimmed;
+  const digits = withoutPrefix.replace(/\D/g, '');
+  if (digits.length === 10 && digits.startsWith('9')) return '0' + digits;
+  return digits;
+}
+
+/** True when the value is a valid Philippine mobile number (09XXXXXXXXX). */
+export function isValidPhMobile(input: string): boolean {
+  return /^09[0-9]{9}$/.test(normalizePhMobile(input));
+}
+
 export function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-PH', {
     year: 'numeric',
