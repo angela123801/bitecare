@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLE_LABELS } from '@/config/constants';
 import { ROLE_MISMATCH_MESSAGE } from '@/lib/navigation';
-import { Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, Phone, IdCard } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, Phone, IdCard, ArrowLeft } from 'lucide-react';
 import type { UserRole } from '@/types';
 import InstallAppButton from '@/components/auth/InstallAppButton';
 import OtpPanel from '@/components/auth/OtpPanel';
@@ -185,6 +185,15 @@ export default function LoginPage() {
     >
       <div className="absolute inset-0 bg-black/40" />
       <div className="relative z-10 w-full max-w-md">
+        <button
+          type="button"
+          onClick={() => navigate(roleChooserTarget)}
+          className="inline-flex items-center gap-2 text-white/85 hover:text-white text-sm font-medium mb-4 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+
         <div className="text-center mb-6">
           <img src="/logo.png" alt="BiteCare Logo" className="w-20 h-20 mx-auto mb-3 drop-shadow-lg" />
           <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-white drop-shadow-md tracking-tight">BiteCare</h1>
@@ -268,7 +277,7 @@ export default function LoginPage() {
 
                 <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 py-2.5">
                   {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {loading ? 'Sending code...' : 'Continue'}
+                  {loading ? 'Signing in...' : 'Login'}
                 </button>
               </form>
             </>

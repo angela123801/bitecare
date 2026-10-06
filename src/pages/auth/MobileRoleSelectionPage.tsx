@@ -1,6 +1,7 @@
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Stethoscope, User, IdCard } from 'lucide-react';
 import InstallAppButton from '@/components/auth/InstallAppButton';
+import { useIsMobile } from '@/lib/useIsMobile';
 
 /**
  * The phone-sized role chooser. Only Resident/User and Health Worker/Staff are
@@ -10,6 +11,10 @@ import InstallAppButton from '@/components/auth/InstallAppButton';
  */
 export default function MobileRoleSelectionPage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+
+  // Tablet and desktop keep their existing role-selection landing page.
+  if (!isMobile) return <Navigate to="/" replace />;
 
   return (
     <div
