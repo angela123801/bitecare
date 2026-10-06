@@ -177,7 +177,15 @@ async function sendViaProvider(provider: SmsProvider, to: string, text: string):
     });
     // A send the phone could not be reached for comes back as 400, so a failed
     // push is caught here rather than after the fact.
-    if (!res.ok) return { ok: false };
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      console.error('[otp] textbee rejected the send', {
+        status: res.status,
+        // Digits are stripped so neither a number nor a code can reach the logs.
+        detail: detail.replace(/\d/g, '#').slice(0, 200),
+      });
+      return { ok: false };
+    }
     const data = await res.json().catch(() => null);
     const result = data?.data;
     // `success` covers queued batches; `failureCount`/`warning` cover immediate

@@ -89,6 +89,14 @@ async function sendOtpSms(phone: string, code: string): Promise<SmsResult> {
           ...(simId !== null && Number.isFinite(simId) ? { simSubscriptionId: simId } : {}),
         }),
       });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        console.error('[account-admin] textbee rejected the send', {
+          status: res.status,
+          // Digits are stripped so neither a number nor a code can reach the logs.
+          detail: detail.replace(/\d/g, '#').slice(0, 200),
+        });
+      }
       if (res.ok) {
         const data = await res.json().catch(() => null);
         const result = data?.data;
