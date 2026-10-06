@@ -62,16 +62,20 @@ function toInternationalPh(phone: string): string {
 
 const textbeeSimId = Number(TEXTBEE_SIM_ID);
 
-function smsProvider(): 'textbee' | 'semaphore' | 'twilio' | 'vonage' | null {
-  if (TEXTBEE_API_KEY) return 'textbee';
-  if (SEMAPHORE_API_KEY) return 'semaphore';
-  if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_FROM) return 'twilio';
-  if (VONAGE_API_KEY && VONAGE_API_SECRET && VONAGE_FROM) return 'vonage';
-  return null;
+type SmsProvider = 'textbee' | 'semaphore' | 'twilio' | 'vonage';
+
+/** Every configured provider, in the order they should be tried. */
+function smsProviderChain(): SmsProvider[] {
+  const chain: SmsProvider[] = [];
+  if (TEXTBEE_API_KEY) chain.push('textbee');
+  if (SEMAPHORE_API_KEY) chain.push('semaphore');
+  if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_FROM) chain.push('twilio');
+  if (VONAGE_API_KEY && VONAGE_API_SECRET && VONAGE_FROM) chain.push('vonage');
+  return chain;
 }
 
 function smsConfigured(): boolean {
-  return smsProvider() !== null;
+  return smsProviderChain().length > 0;
 }
 
 function providerConfigured(channel: Channel): boolean {
@@ -88,80 +92,117 @@ function otpMessage(purpose: Purpose, code: string): string {
   return `Your BiteCare verification code is ${code}. Use it ${context}. It expires in 5 minutes. Never share this code.`;
 }
 
-async function sendSms(to: string, purpose: Purpose, code: string): Promise<boolean> {
-  const provider = smsProvider();
-  const text = otpMessage(purpose, code);
+/**
+ * The gateway phone accepts a message with HTTP 200 and only then tries to push
+ * it to the phone over FCM. When the phone's push token has gone stale (for
+ * example after the phone restarts or the app is updated) the push fails a
+ * moment later and the message is marked 'failed' — but the 200 has already
+ * been returned, so a naive send looks successful while nothing is delivered.
+ * When a second provider is configured we glance at the result once so we can
+ * fall back instead of silently losing the code.
+ */
+async function textbeeDeliveryFailed(): Promise<boolean> {
+  if (!TEXTBEE_DEVICE_ID) return false;
   try {
-    if (provider === 'textbee') {
-      const res = await fetch('https://api.textbee.dev/api/v1/gateway/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': TEXTBEE_API_KEY! },
-        body: JSON.stringify({
-          recipients: [toInternationalPh(to)],
-          message: text,
-          ...(TEXTBEE_DEVICE_ID ? { deviceId: TEXTBEE_DEVICE_ID } : {}),
-          ...(Number.isInteger(textbeeSimId) ? { simSubscriptionId: textbeeSimId } : {}),
-        }),
-      });
-      if (!res.ok) return false;
-      // A 200 only means the phone accepted the message into its queue; the
-      // device still has to be online to actually send it.
-      const data = await res.json().catch(() => null);
-      return data?.data?.success !== false;
-    }
-
-    if (provider === 'semaphore') {
-      const res = await fetch('https://api.semaphore.co/api/v4/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apikey: SEMAPHORE_API_KEY,
-          number: to,
-          message: text,
-          ...(SEMAPHORE_SENDER ? { sendername: SEMAPHORE_SENDER } : {}),
-        }),
-      });
-      return res.ok;
-    }
-
-    if (provider === 'twilio') {
-      const body = new URLSearchParams({ To: to, From: TWILIO_FROM!, Body: text });
-      const res = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body,
-        },
-      );
-      return res.ok;
-    }
-
-    if (provider === 'vonage') {
-      const res = await fetch('https://rest.nexmo.com/sms/json', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: VONAGE_API_KEY,
-          api_secret: VONAGE_API_SECRET,
-          to,
-          from: VONAGE_FROM,
-          text,
-        }),
-      });
-      if (!res.ok) return false;
-      const data = await res.json().catch(() => null);
-      const first = data?.messages?.[0];
-      return first?.status === '0';
-    }
-
-    return false;
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    const res = await fetch(
+      `https://api.textbee.dev/api/v1/gateway/devices/${TEXTBEE_DEVICE_ID}/messages?limit=1`,
+      { headers: { 'x-api-key': TEXTBEE_API_KEY! } },
+    );
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => null);
+    const latest = data?.data?.[0];
+    return latest?.status === 'failed';
   } catch {
     return false;
   }
+}
+
+async function sendViaProvider(provider: SmsProvider, to: string, text: string): Promise<boolean> {
+  if (provider === 'textbee') {
+    const res = await fetch('https://api.textbee.dev/api/v1/gateway/send-sms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': TEXTBEE_API_KEY! },
+      body: JSON.stringify({
+        recipients: [toInternationalPh(to)],
+        message: text,
+        ...(TEXTBEE_DEVICE_ID ? { deviceId: TEXTBEE_DEVICE_ID } : {}),
+        ...(Number.isInteger(textbeeSimId) ? { simSubscriptionId: textbeeSimId } : {}),
+      }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => null);
+    if (data?.data?.success === false) return false;
+    if (smsProviderChain().length > 1 && await textbeeDeliveryFailed()) return false;
+    return true;
+  }
+
+  if (provider === 'semaphore') {
+    const res = await fetch('https://api.semaphore.co/api/v4/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apikey: SEMAPHORE_API_KEY,
+        number: to,
+        message: text,
+        ...(SEMAPHORE_SENDER ? { sendername: SEMAPHORE_SENDER } : {}),
+      }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => null);
+    // Semaphore answers 200 even when the send is refused; the body carries the
+    // real outcome, so treat a rejected entry as a failure and fall through.
+    if (Array.isArray(data) && data[0]?.status === 'failed') return false;
+    return true;
+  }
+
+  if (provider === 'twilio') {
+    const body = new URLSearchParams({ To: to, From: TWILIO_FROM!, Body: text });
+    const res = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body,
+      },
+    );
+    return res.ok;
+  }
+
+  const res = await fetch('https://rest.nexmo.com/sms/json', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      api_key: VONAGE_API_KEY,
+      api_secret: VONAGE_API_SECRET,
+      to,
+      from: VONAGE_FROM,
+      text,
+    }),
+  });
+  if (!res.ok) return false;
+  const data = await res.json().catch(() => null);
+  return data?.messages?.[0]?.status === '0';
+}
+
+/**
+ * Send the code, trying each configured provider in turn. The first provider to
+ * accept the message wins; if one fails we move to the next so a single dead
+ * gateway cannot stop residents from signing in.
+ */
+async function sendSms(to: string, purpose: Purpose, code: string): Promise<boolean> {
+  const text = otpMessage(purpose, code);
+  for (const provider of smsProviderChain()) {
+    try {
+      if (await sendViaProvider(provider, to, text)) return true;
+    } catch {
+      // Try the next provider.
+    }
+  }
+  return false;
 }
 
 async function deliver(channel: Channel, to: string, purpose: Purpose, code: string): Promise<boolean> {

@@ -48,10 +48,18 @@ function toInternationalPh(phone: string): string {
  * or the send failed, so the caller reports delivery honestly instead of
  * pretending the message went out.
  */
+/**
+ * Send a code, trying each configured gateway in turn so a single dead gateway
+ * cannot block account creation. The TextBee path also glances at the result:
+ * the phone accepts a message with HTTP 200 and only then fails the FCM push,
+ * so a 200 alone does not prove delivery when a fallback exists.
+ */
 async function sendOtpSms(phone: string, code: string): Promise<boolean> {
   const text = `Your BiteCare verification code is ${code}. Use it to verify the new account. It expires in 5 minutes. Never share this code.`;
-  try {
-    if (TEXTBEE_API_KEY) {
+  const hasFallback = Boolean(SEMAPHORE_API_KEY);
+
+  if (TEXTBEE_API_KEY) {
+    try {
       const simId = Number(TEXTBEE_SIM_ID);
       const res = await fetch('https://api.textbee.dev/api/v1/gateway/send-sms', {
         method: 'POST',
@@ -63,12 +71,30 @@ async function sendOtpSms(phone: string, code: string): Promise<boolean> {
           ...(Number.isInteger(simId) ? { simSubscriptionId: simId } : {}),
         }),
       });
-      if (!res.ok) return false;
-      const data = await res.json().catch(() => null);
-      return data?.data?.success !== false;
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.data?.success !== false) {
+          if (!hasFallback) return true;
+          await new Promise((resolve) => setTimeout(resolve, 700));
+          const statusRes = await fetch(
+            `https://api.textbee.dev/api/v1/gateway/devices/${TEXTBEE_DEVICE_ID}/messages?limit=1`,
+            { headers: { 'x-api-key': TEXTBEE_API_KEY } },
+          );
+          if (statusRes.ok) {
+            const statusData = await statusRes.json().catch(() => null);
+            if (statusData?.data?.[0]?.status !== 'failed') return true;
+          } else {
+            return true;
+          }
+        }
+      }
+    } catch {
+      // Fall through to Semaphore below.
     }
+  }
 
-    if (SEMAPHORE_API_KEY) {
+  if (SEMAPHORE_API_KEY) {
+    try {
       const res = await fetch('https://api.semaphore.co/api/v4/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -79,13 +105,16 @@ async function sendOtpSms(phone: string, code: string): Promise<boolean> {
           ...(SEMAPHORE_SENDER ? { sendername: SEMAPHORE_SENDER } : {}),
         }),
       });
-      return res.ok;
+      if (!res.ok) return false;
+      const data = await res.json().catch(() => null);
+      if (Array.isArray(data) && data[0]?.status === 'failed') return false;
+      return true;
+    } catch {
+      return false;
     }
-
-    return false;
-  } catch {
-    return false;
   }
+
+  return false;
 }
 
 Deno.serve(async (req: Request) => {
