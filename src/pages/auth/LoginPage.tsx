@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLE_LABELS } from '@/config/constants';
 import { ROLE_MISMATCH_MESSAGE } from '@/lib/navigation';
-import { Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, Phone, IdCard, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, Phone, IdCard, ArrowLeft, UserPlus, ArrowRight } from 'lucide-react';
 import type { UserRole } from '@/types';
 import InstallAppButton from '@/components/auth/InstallAppButton';
 import OtpPanel from '@/components/auth/OtpPanel';
@@ -16,7 +16,6 @@ import {
   type OtpChannelOption,
 } from '@/lib/otp';
 import { normalizePhMobile, isValidPhMobile } from '@/lib/utils';
-import { useIsMobile } from '@/lib/useIsMobile';
 
 export default function LoginPage() {
   const { applySession, signOut } = useAuth();
@@ -24,9 +23,13 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const preselectedRole = searchParams.get('role') as UserRole | null;
   const isStaff = Boolean(preselectedRole) && preselectedRole !== 'user';
-  const isMobile = useIsMobile();
-  // On phones the compact role screen is the chooser; elsewhere the landing page.
-  const roleChooserTarget = isMobile ? '/roles' : '/';
+  // Resident/User login is the default when no role is chosen. The bottom
+  // actions are driven by role only, so every screen size behaves the same.
+  const isResidentLogin = !preselectedRole || preselectedRole === 'user';
+  const isHealthWorkerLogin = preselectedRole === 'health_worker';
+  // '/roles' is the compact chooser on phones and redirects to the full role
+  // picker on tablet and desktop, so this one target fits every device.
+  const roleChooserTarget = '/roles';
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -303,16 +306,58 @@ export default function LoginPage() {
           )}
         </div>
 
-        <p className="mt-5 text-center text-sm text-white/80 drop-shadow">
-          {isStaff ? (
-            <>Not a staff member? <Link to="/login?role=user" className="text-white font-semibold hover:underline">Sign in as a Resident</Link></>
-          ) : (
-            <>Staff member? <Link to="/login?role=health_worker" className="text-white font-semibold hover:underline">Use staff login</Link></>
-          )}
-        </p>
-        <p className="text-center text-sm text-white/70 drop-shadow mt-1">
-          <Link to={roleChooserTarget} className="hover:underline">Choose a different role</Link>
-        </p>
+        {/* Bottom actions — identical on phone, tablet, laptop and desktop.
+            Resident login offers registration; Health Worker login offers only
+            a way back to role selection. */}
+        {isResidentLogin ? (
+          <div className="mt-6 space-y-3">
+            <Link
+              to="/register"
+              className="group w-full flex items-center gap-3 rounded-2xl bg-white/95 backdrop-blur-md border border-white/30 p-4 transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5"
+            >
+              <span className="w-11 h-11 rounded-xl bg-amber-50 group-hover:bg-amber-100 flex items-center justify-center flex-shrink-0 transition-colors">
+                <UserPlus className="w-5 h-5 text-amber-600" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold text-gray-900">Register as Resident</span>
+                <span className="block text-xs text-gray-500 mt-0.5">Create a user account and verify by SMS</span>
+              </span>
+              <ArrowRight className="w-4 h-4 text-gray-300 flex-shrink-0 transition-all group-hover:translate-x-0.5 group-hover:text-primary-500" />
+            </Link>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => navigate(roleChooserTarget)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-medium border border-white/25 transition-colors"
+              >
+                <IdCard className="w-4 h-4" />
+                Choose Another Role
+              </button>
+            </div>
+          </div>
+        ) : isHealthWorkerLogin ? (
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => navigate(roleChooserTarget)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-sm font-medium border border-white/25 transition-colors"
+            >
+              <IdCard className="w-4 h-4" />
+              Choose Another Role
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="mt-5 text-center text-sm text-white/80 drop-shadow">
+              Not a staff member?{' '}
+              <Link to="/login?role=user" className="text-white font-semibold hover:underline">Sign in as a Resident</Link>
+            </p>
+            <p className="text-center text-sm text-white/70 drop-shadow mt-1">
+              <Link to={roleChooserTarget} className="hover:underline">Choose a different role</Link>
+            </p>
+          </>
+        )}
 
         <div className="mt-4 flex justify-center">
           <InstallAppButton />
