@@ -6,7 +6,8 @@ import type { BiteReport, BiteReportStatusHistory, VaccinationRecord, ReportStat
 import { REPORT_STATUS_COLORS, REPORT_STATUS_LABELS, SEVERITY_COLORS, SEVERITY_LABELS, ANIMAL_TYPE_LABELS, CATEGORY_LABELS, VACCINATION_STATUS_COLORS, VACCINATION_STATUS_LABELS } from '@/config/constants';
 import { formatDate, formatDateTime, cn, getErrorMessage } from '@/lib/utils';
 import { notifyUser } from '@/lib/notifications';
-import { ArrowLeft, Loader2, AlertCircle, Clock, Syringe, User, PawPrint, MapPin, ShieldCheck, Send, CheckCircle2, UserPlus } from 'lucide-react';
+import EditReportLocationModal from '@/components/map/EditReportLocationModal';
+import { ArrowLeft, Loader2, AlertCircle, Clock, Syringe, User, PawPrint, MapPin, ShieldCheck, Send, CheckCircle2, UserPlus, Trash2 } from 'lucide-react';
 
 const ALL_STATUSES: ReportStatus[] = ['reported','under_investigation','treatment_started','treatment_ongoing','treatment_completed','closed','cancelled'];
 const WOUND_LABELS: Record<string, string> = { bite: 'Bite', scratch: 'Scratch', lick_on_broken_skin: 'Lick on Broken Skin', other: 'Other' };
@@ -48,6 +49,9 @@ export default function ReportDetailPage() {
   const [assigning, setAssigning] = useState(false);
 
   const [markingDose, setMarkingDose] = useState<string | null>(null);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const isStaff = profile?.role === 'health_worker' || profile?.role === 'admin' || profile?.role === 'super_admin';
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
@@ -162,8 +166,25 @@ export default function ReportDetailPage() {
     </div>
   );
 
+  const handleDelete = async () => {
+    if (!id) return;
+    setDeleting(true); setStatusError('');
+    const { error: e } = await supabase.from('bite_reports').delete().eq('id', id);
+    if (e) {
+      setStatusError(getErrorMessage(e, 'Failed to delete this report.'));
+      setDeleting(false); setDeleteOpen(false);
+      return;
+    }
+    navigate('/admin/reports', { replace: true });
+  };
+
   const pBrgy = report.patient_barangay as Barangay | undefined;
   const iBrgy = report.incident_barangay as Barangay | undefined;
+  const hasCoords = report.incident_latitude != null && report.incident_longitude != null;
+  const canEditLocation = report.reporter_id === profile?.id || isStaff;
+  const barangayCenter = iBrgy?.latitude != null && iBrgy?.longitude != null
+    ? { lat: iBrgy.latitude, lng: iBrgy.longitude }
+    : undefined;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -207,8 +228,19 @@ export default function ReportDetailPage() {
         <Section icon={MapPin} title="Incident Location">
           <Row label="Location" value={report.incident_location} />
           <Row label="Barangay" value={iBrgy?.name} />
-          {report.incident_latitude && report.incident_longitude && (
-            <Row label="Coordinates" value={`${report.incident_latitude.toFixed(5)}, ${report.incident_longitude.toFixed(5)}`} />
+          <Row
+            label="Coordinates"
+            value={hasCoords ? `${report.incident_latitude!.toFixed(5)}, ${report.incident_longitude!.toFixed(5)}` : 'Not pinned'}
+          />
+          {canEditLocation && (
+            <button
+              type="button"
+              onClick={() => setLocationOpen(true)}
+              className="btn-secondary text-sm flex items-center gap-1.5 mt-3"
+            >
+              <MapPin className="w-4 h-4" />
+              {hasCoords ? 'Edit location on map' : 'Pin location on map'}
+            </button>
           )}
         </Section>
 
@@ -261,6 +293,20 @@ export default function ReportDetailPage() {
             </div>
           )}
         </Section>
+
+        {isAdmin && (
+          <section className="card p-5 border-danger-200">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-danger-700 uppercase tracking-wide mb-3">
+              <Trash2 className="w-4 h-4" /> Danger Zone
+            </h2>
+            <p className="text-sm text-gray-600 mb-3">
+              Deleting this report permanently removes it, its photos, its vaccination records and its map marker. This cannot be undone.
+            </p>
+            <button type="button" className="btn-danger flex items-center gap-2" onClick={() => setDeleteOpen(true)}>
+              <Trash2 className="w-4 h-4" /> Delete report
+            </button>
+          </section>
+        )}
 
         {isStaff && (
           <section className="card p-5 border-primary-200">
@@ -321,6 +367,45 @@ export default function ReportDetailPage() {
           </section>
         )}
       </div>
+
+      {locationOpen && (
+        <EditReportLocationModal
+          reportId={report.id}
+          current={hasCoords ? { lat: report.incident_latitude!, lng: report.incident_longitude! } : null}
+          fallbackCenter={barangayCenter}
+          onClose={() => setLocationOpen(false)}
+          onSaved={() => { setLocationOpen(false); refreshReport(); }}
+        />
+      )}
+
+      {deleteOpen && (
+        <div
+          className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirm delete report"
+          onClick={() => !deleting && setDeleteOpen(false)}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="w-11 h-11 rounded-full bg-danger-50 flex items-center justify-center mb-3">
+              <Trash2 className="w-5 h-5 text-danger-600" />
+            </div>
+            <h2 className="text-base font-bold text-gray-900">Delete this report?</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              This permanently removes the report for {report.patient_name}, along with its photos, vaccination records and map marker. This cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button type="button" className="btn-secondary" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+                Cancel
+              </button>
+              <button type="button" className="btn-danger flex items-center gap-2" onClick={handleDelete} disabled={deleting}>
+                {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {deleting ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

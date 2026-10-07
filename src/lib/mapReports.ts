@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getErrorMessage } from '@/lib/utils';
-import type { AnimalType, ReportStatus } from '@/types';
+import type { AnimalType, ReportStatus, Severity } from '@/types';
 
 /** The columns the map needs. Deliberately excludes patient name, phone,
  *  address and any medical fields so no private data reaches the map. */
 const MAP_REPORT_COLUMNS =
-  'id, category, animal_type, incident_location, incident_latitude, incident_longitude, bite_date, status, incident_barangay_id';
+  'id, category, animal_type, incident_location, incident_latitude, incident_longitude, bite_date, status, severity, incident_barangay_id';
 
 export interface MapFilters {
   dateFrom: string;
   dateTo: string;
   barangayId: string;
+  severity: '' | Severity;
   animalType: '' | AnimalType;
   status: '' | ReportStatus;
 }
@@ -20,6 +21,7 @@ export const EMPTY_FILTERS: MapFilters = {
   dateFrom: '',
   dateTo: '',
   barangayId: '',
+  severity: '',
   animalType: '',
   status: '',
 };
@@ -33,6 +35,7 @@ export interface MapReport {
   incident_longitude: number;
   bite_date: string;
   status: ReportStatus;
+  severity: Severity;
   incident_barangay_id: string | null;
 }
 
@@ -60,6 +63,7 @@ export function useMapReports(filters: MapFilters) {
     if (filters.dateFrom) query = query.gte('bite_date', filters.dateFrom);
     if (filters.dateTo) query = query.lte('bite_date', filters.dateTo);
     if (filters.barangayId) query = query.eq('incident_barangay_id', filters.barangayId);
+    if (filters.severity) query = query.eq('severity', filters.severity);
     if (filters.animalType) query = query.eq('animal_type', filters.animalType);
     if (filters.status) query = query.eq('status', filters.status);
 
@@ -70,6 +74,7 @@ export function useMapReports(filters: MapFilters) {
     filters.dateFrom,
     filters.dateTo,
     filters.barangayId,
+    filters.severity,
     filters.animalType,
     filters.status,
   ]);

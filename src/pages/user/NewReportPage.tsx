@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -8,8 +8,10 @@ import { ANIMAL_TYPE_LABELS, CATEGORY_LABELS } from '@/config/constants';
 import { cn, getErrorMessage } from '@/lib/utils';
 import {
   ChevronLeft, ChevronRight, Loader2, CheckCircle2, User, PawPrint,
-  MapPin, ClipboardCheck, AlertCircle, Camera, MapPinned, X, Crosshair,
+  MapPin, ClipboardCheck, AlertCircle, Camera, X,
 } from 'lucide-react';
+import LocationPicker from '@/components/map/LocationPicker';
+import { isValidLatLng } from '@/lib/geo';
 
 const STEPS = [
   { label: 'Patient Info', icon: User },
@@ -66,8 +68,6 @@ export default function NewReportPage() {
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [photos, setPhotos] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
-  const [showManualCoords, setShowManualCoords] = useState(false);
-  const [geoLoading, setGeoLoading] = useState(false);
 
   useEffect(() => {
     supabase.from('barangays').select('*').order('name').then(({ data, error }) => {
@@ -105,23 +105,27 @@ export default function NewReportPage() {
     setPreviews(np.map((file) => URL.createObjectURL(file)));
   };
 
-  /* --- Geolocation --- */
-  const useMyLocation = () => {
-    if (!navigator.geolocation) { setError('Geolocation not supported by your browser'); return; }
-    setGeoLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setF((p) => ({
-          ...p,
-          incident_latitude: pos.coords.latitude.toFixed(6),
-          incident_longitude: pos.coords.longitude.toFixed(6),
-        }));
-        setGeoLoading(false);
-      },
-      (err) => { setError(`Location error: ${err.message}`); setGeoLoading(false); },
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
-  };
+  /* --- Location --- */
+  const pinnedLocation = useMemo(() => {
+    const lat = Number(f.incident_latitude);
+    const lng = Number(f.incident_longitude);
+    return f.incident_latitude && f.incident_longitude && isValidLatLng(lat, lng) ? { lat, lng } : null;
+  }, [f.incident_latitude, f.incident_longitude]);
+
+  // Open the picker over the incident barangay when we know roughly where it is.
+  const barangayCenter = useMemo(() => {
+    const brgy = barangays.find((b) => b.id === f.incident_barangay_id);
+    return brgy?.latitude != null && brgy?.longitude != null
+      ? { lat: brgy.latitude, lng: brgy.longitude }
+      : undefined;
+  }, [barangays, f.incident_barangay_id]);
+
+  const setPinnedLocation = (value: { lat: number; lng: number } | null) =>
+    setF((p) => ({
+      ...p,
+      incident_latitude: value ? String(value.lat) : '',
+      incident_longitude: value ? String(value.lng) : '',
+    }));
 
   /* --- Validation --- */
   const validate = (): boolean => {
@@ -138,6 +142,7 @@ export default function NewReportPage() {
       if (!f.bite_site.trim()) e.bite_site = 'Required';
     } else if (step === 2) {
       if (!f.incident_location.trim()) e.incident_location = 'Required';
+      if (!pinnedLocation) e.incident_latitude = 'Pin the incident location on the map';
     }
     setErrs(e);
     return !Object.keys(e).length;
@@ -346,32 +351,15 @@ export default function NewReportPage() {
                 <div><Label text="Barangay" /><BrgySelect field="incident_barangay_id" /></div>
               </div>
 
-              {/* Lat/Lng */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <button type="button" className="btn-secondary text-sm flex items-center gap-1.5" onClick={useMyLocation} disabled={geoLoading}>
-                    {geoLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crosshair className="w-4 h-4" />}
-                    {geoLoading ? 'Locating…' : 'Use my location'}
-                  </button>
-                  <button type="button" className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1" onClick={() => setShowManualCoords(!showManualCoords)}>
-                    <MapPinned className="w-4 h-4" />{showManualCoords ? 'Hide coordinates' : 'Enter manually'}
-                  </button>
-                </div>
-                {(showManualCoords || f.incident_latitude) && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label text="Latitude" />
-                      <input className="input-field" type="number" step="any" placeholder="e.g. 14.5995" value={f.incident_latitude} onChange={(e) => set('incident_latitude', e.target.value)} />
-                    </div>
-                    <div>
-                      <Label text="Longitude" />
-                      <input className="input-field" type="number" step="any" placeholder="e.g. 120.9842" value={f.incident_longitude} onChange={(e) => set('incident_longitude', e.target.value)} />
-                    </div>
-                  </div>
-                )}
-                {f.incident_latitude && f.incident_longitude && !showManualCoords && (
-                  <p className="text-xs text-gray-500">📍 {f.incident_latitude}, {f.incident_longitude}</p>
-                )}
+              {/* Location pin */}
+              <div className="space-y-2">
+                <Label text="Pin the exact spot" req />
+                <LocationPicker
+                  value={pinnedLocation}
+                  onChange={setPinnedLocation}
+                  fallbackCenter={barangayCenter}
+                />
+                <Err k="incident_latitude" />
               </div>
             </div>
 
