@@ -1,27 +1,39 @@
 import { useState } from 'react';
-import { Download, Loader2, Smartphone } from 'lucide-react';
-import { useInstallApp } from '@/lib/installPrompt';
+import { BadgeCheck, Download, Loader2, Smartphone } from 'lucide-react';
+import { installUnavailableMessage, useInstallApp } from '@/lib/installPrompt';
 
 /**
  * Offers installing BiteCare on the current device. Where the browser provides
- * its own prompt the button uses it; on iOS and browsers that never fire one it
- * shows the exact steps instead, so the option is always present and never a
- * button that quietly does nothing.
+ * its own prompt the button fires it directly; where the browser never offers
+ * one the button explains that plainly, rather than sending the user into
+ * browser settings or faking an install.
  */
 export default function InstallAppButton() {
-  const { canInstall, install, installing, platform, needsManualSteps } = useInstallApp();
-  const [showHelp, setShowHelp] = useState(false);
+  const { state, install, installing } = useInstallApp();
+  const [showFallback, setShowFallback] = useState(false);
 
-  if (!canInstall) return null;
+  // The user closed the browser's prompt; it cannot be shown again this session.
+  if (state === 'dismissed') return null;
+
+  if (state === 'installed') {
+    return (
+      <p
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/15 backdrop-blur-sm text-white text-sm font-medium border border-white/25"
+        aria-live="polite"
+      >
+        <BadgeCheck className="w-4 h-4" />
+        BiteCare is installed on this device
+      </p>
+    );
+  }
 
   const handleClick = async () => {
-    if (needsManualSteps) { setShowHelp(true); return; }
+    if (state === 'unavailable') {
+      setShowFallback(true);
+      return;
+    }
     await install();
   };
-
-  const help = platform === 'ios'
-    ? 'Tap the Share button in Safari, then choose Add to Home Screen.'
-    : 'Open your browser menu (the three dots) and choose Install app or Add to Home screen.';
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -34,10 +46,15 @@ export default function InstallAppButton() {
         {installing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
         Install app on this device
       </button>
-      {showHelp && (
-        <p className="flex items-start gap-2 max-w-xs text-xs text-white/85 text-left bg-black/35 backdrop-blur-sm rounded-lg p-3">
+
+      {showFallback && (
+        <p
+          className="flex items-start gap-2 max-w-xs text-xs text-white/85 text-left bg-black/35 backdrop-blur-sm rounded-lg p-3"
+          role="status"
+          aria-live="polite"
+        >
           <Smartphone className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <span>{help}</span>
+          <span>{installUnavailableMessage()}</span>
         </p>
       )}
     </div>

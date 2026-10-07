@@ -1,9 +1,12 @@
 const CACHE_NAME = 'bitecare-v1';
 const PRECACHE = [
   '/',
+  '/manifest.webmanifest',
   '/logo.png',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
+  '/icons/icon-maskable-512.png',
+  '/icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (event) => {
