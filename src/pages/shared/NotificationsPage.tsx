@@ -37,7 +37,7 @@ const TYPE_BG: Record<NotificationType, string> = {
 type Filter = 'all' | 'unread';
 
 export default function NotificationsPage() {
-  const { user, isRoleAtLeast } = useAuth();
+  const { user, isRole } = useAuth();
   const navigate = useNavigate();
   const { refreshNotifications } = useOutletContext<{ refreshNotifications: () => Promise<number | undefined> }>();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -112,12 +112,14 @@ export default function NotificationsPage() {
   const openNotification = (n: Notification) => {
     if (!n.is_read) markAsRead(n.id);
     if (n.reference_type === 'bite_report' || n.reference_type === 'vaccination') {
-      const isStaff = isRoleAtLeast('health_worker');
+      // Each role has its own case route; sending a health worker to the
+      // admin-only path would bounce them back to the dashboard.
+      const caseBase = isRole('user') ? '/reports' : isRole('health_worker') ? '/cases' : '/admin/reports';
       if (n.reference_id) {
-        navigate(isStaff ? `/admin/reports/${n.reference_id}` : `/reports/${n.reference_id}`);
+        navigate(`${caseBase}/${n.reference_id}`);
         return;
       }
-      navigate(isStaff ? '/admin/reports' : '/my-reports');
+      navigate(isRole('user') ? '/my-reports' : caseBase);
     }
   };
 

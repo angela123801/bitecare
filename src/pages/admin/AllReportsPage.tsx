@@ -8,7 +8,13 @@ import { Search, Loader2, Filter, ChevronLeft, ChevronRight, Inbox } from 'lucid
 
 const PAGE_SIZE = 20;
 
-export default function AllReportsPage() {
+interface AllReportsPageProps {
+  /** Base path for a case's detail page, so each role stays within its own route. */
+  detailPath?: string;
+  title?: string;
+}
+
+export default function AllReportsPage({ detailPath = '/admin/reports', title = 'Bite Reports' }: AllReportsPageProps) {
   const [reports, setReports] = useState<BiteReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -52,7 +58,7 @@ export default function AllReportsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Bite Reports</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
           <p className="text-sm text-gray-500 mt-1">{total} total reports</p>
         </div>
       </div>
@@ -114,7 +120,7 @@ export default function AllReportsPage() {
                 {reports.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
-                      <Link to={`/admin/reports/${r.id}`} className="font-medium text-gray-900 hover:text-primary-600">
+                      <Link to={`${detailPath}/${r.id}`} className="font-medium text-gray-900 hover:text-primary-600">
                         {r.patient_name}
                       </Link>
                     </td>

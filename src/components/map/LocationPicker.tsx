@@ -49,6 +49,9 @@ interface LocationPickerProps {
   onChange: (value: LatLngValue | null) => void;
   /** Starting view when no pin has been placed yet. */
   fallbackCenter?: LatLngValue;
+  /** When false, the numeric coordinates are hidden from the interface.
+   *  The pin is still placed and the coordinates are still saved. */
+  showCoordinates?: boolean;
   heightClass?: string;
   className?: string;
 }
@@ -62,6 +65,7 @@ export default function LocationPicker({
   value,
   onChange,
   fallbackCenter,
+  showCoordinates = true,
   heightClass = 'h-56 sm:h-64',
   className,
 }: LocationPickerProps) {
@@ -191,37 +195,41 @@ export default function LocationPicker({
         Tap the map or drag the pin to mark the exact spot. Zoom in for precision.
       </p>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Latitude</label>
-          <input
-            type="number"
-            step="any"
-            inputMode="decimal"
-            className="input-field text-sm py-1.5"
-            placeholder="10.684000"
-            value={latText}
-            onChange={(e) => handleManual(e.target.value, lngText)}
-          />
+      {showCoordinates && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Latitude</label>
+            <input
+              type="number"
+              step="any"
+              inputMode="decimal"
+              className="input-field text-sm py-1.5"
+              placeholder="10.684000"
+              value={latText}
+              onChange={(e) => handleManual(e.target.value, lngText)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Longitude</label>
+            <input
+              type="number"
+              step="any"
+              inputMode="decimal"
+              className="input-field text-sm py-1.5"
+              placeholder="122.974000"
+              value={lngText}
+              onChange={(e) => handleManual(latText, e.target.value)}
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Longitude</label>
-          <input
-            type="number"
-            step="any"
-            inputMode="decimal"
-            className="input-field text-sm py-1.5"
-            placeholder="122.974000"
-            value={lngText}
-            onChange={(e) => handleManual(latText, e.target.value)}
-          />
-        </div>
-      </div>
+      )}
 
       {value ? (
         <p className="text-xs text-success-700 flex items-center gap-1.5">
           <MapPin className="w-3.5 h-3.5" />
-          Pinned at {value.lat.toFixed(6)}, {value.lng.toFixed(6)}
+          {showCoordinates
+            ? `Pinned at ${value.lat.toFixed(6)}, ${value.lng.toFixed(6)}`
+            : 'Incident spot pinned on the map. The exact coordinates are saved privately.'}
         </p>
       ) : (
         <p className="text-xs text-warning-700 flex items-center gap-1.5">

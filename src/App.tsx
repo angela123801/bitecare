@@ -66,11 +66,11 @@ export default function App() {
             {/* Health Worker+ */}
             <Route path="/vaccinations" element={<ProtectedRoute minRole="health_worker"><VaccinationManagementPage /></ProtectedRoute>} />
             <Route path="/appointments" element={<ProtectedRoute minRole="health_worker"><AppointmentsPage /></ProtectedRoute>} />
-            <Route path="/cases" element={<ProtectedRoute minRole="health_worker"><AllReportsPage /></ProtectedRoute>} />
+            <Route path="/cases" element={<ProtectedRoute minRole="health_worker"><AllReportsPage detailPath="/cases" title="Case Management" /></ProtectedRoute>} />
             <Route path="/cases/:id" element={<ProtectedRoute minRole="health_worker"><ReportDetailPage /></ProtectedRoute>} />
 
             {/* Admin+ */}
-            <Route path="/admin/reports" element={<ProtectedRoute minRole="admin"><AllReportsPage /></ProtectedRoute>} />
+            <Route path="/admin/reports" element={<ProtectedRoute minRole="admin"><AllReportsPage detailPath="/admin/reports" /></ProtectedRoute>} />
             <Route path="/admin/reports/:id" element={<ProtectedRoute minRole="admin"><ReportDetailPage /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute minRole="admin"><UserManagementPage /></ProtectedRoute>} />
             <Route path="/admin/users/new" element={<ProtectedRoute minRole="health_worker"><CreateAccountPage /></ProtectedRoute>} />

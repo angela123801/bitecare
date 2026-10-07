@@ -16,6 +16,7 @@ import {
   ClipboardList,
   CalendarCheck,
   Clock,
+  Stethoscope,
   Users,
   Building2,
   ShieldCheck,
@@ -240,7 +241,7 @@ export default function DashboardPage() {
         )}
         {role === 'health_worker' && (
           <>
-            <StatsCard label="Assigned Cases" value={stats.assignedCases ?? 0} icon={<ClipboardList className="w-5 h-5 text-white" />} color="bg-teal-600" />
+            <StatsCard label="Assigned Cases" value={stats.assignedCases ?? 0} icon={<ClipboardList className="w-5 h-5 text-white" />} color="bg-teal-600" to="/cases" />
             <StatsCard label="Today's Vaccinations" value={stats.todayVaccinations ?? 0} icon={<CalendarCheck className="w-5 h-5 text-white" />} color="bg-sky-500" />
             <StatsCard label="Overdue Follow-ups" value={stats.overdueFollowups ?? 0} icon={<Clock className="w-5 h-5 text-white" />} color="bg-red-500" />
           </>
@@ -261,14 +262,24 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Quick Actions — user role only */}
-      {role === 'user' && (
+      {/* Quick Actions */}
+      {(role === 'user' || role === 'health_worker') && (
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-3">Quick Actions</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <QuickAction to="/reports/new" icon={<Plus className="w-5 h-5" />} label="Report Animal Bite" />
-            <QuickAction to="/map" icon={<MapPin className="w-5 h-5" />} label="View Map" />
-            <QuickAction to="/first-aid" icon={<HeartPulse className="w-5 h-5" />} label="First Aid Guide" />
+            {role === 'user' ? (
+              <>
+                <QuickAction to="/reports/new" icon={<Plus className="w-5 h-5" />} label="Report Animal Bite" />
+                <QuickAction to="/map" icon={<MapPin className="w-5 h-5" />} label="View Map" />
+                <QuickAction to="/first-aid" icon={<HeartPulse className="w-5 h-5" />} label="First Aid Guide" />
+              </>
+            ) : (
+              <>
+                <QuickAction to="/cases" icon={<Stethoscope className="w-5 h-5" />} label="Case Management" />
+                <QuickAction to="/map" icon={<MapPin className="w-5 h-5" />} label="Bite Report Map" />
+                <QuickAction to="/vaccinations" icon={<Syringe className="w-5 h-5" />} label="Vaccinations" />
+              </>
+            )}
           </div>
         </div>
       )}

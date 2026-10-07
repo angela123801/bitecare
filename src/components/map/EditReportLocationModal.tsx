@@ -30,6 +30,7 @@ export default function EditReportLocationModal({
   const [value, setValue] = useState(current);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showCoords, setShowCoords] = useState(true);
 
   const handleSave = async () => {
     if (!value || !isValidLatLng(value.lat, value.lng)) {
@@ -87,7 +88,21 @@ export default function EditReportLocationModal({
             </div>
           )}
 
-          <LocationPicker value={value} onChange={setValue} fallbackCenter={fallbackCenter} />
+          <LocationPicker
+            value={value}
+            onChange={setValue}
+            fallbackCenter={fallbackCenter}
+            showCoordinates={showCoords}
+          />
+          <label className="flex items-center gap-2 text-xs font-medium text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="rounded border-gray-300"
+              checked={!showCoords}
+              onChange={(e) => setShowCoords(!e.target.checked)}
+            />
+            Hide coordinates
+          </label>
         </div>
 
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 sticky bottom-0 bg-white">

@@ -111,7 +111,7 @@ export default function FirstAidPage() {
             >
               <span className="block text-lg font-bold">Category {cat}</span>
               <span className="block text-xs mt-0.5">
-                {cat === 'I' ? 'Low risk' : cat === 'II' ? 'Moderate risk' : 'High risk'}
+                {cat === 'I' ? 'Minimal scratch' : cat === 'II' ? 'Moderate risk' : 'High risk'}
               </span>
             </button>
           ))}

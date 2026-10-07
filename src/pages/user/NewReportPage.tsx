@@ -68,6 +68,7 @@ export default function NewReportPage() {
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [photos, setPhotos] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+  const [showCoords, setShowCoords] = useState(true);
 
   useEffect(() => {
     supabase.from('barangays').select('*').order('name').then(({ data, error }) => {
@@ -353,12 +354,29 @@ export default function NewReportPage() {
 
               {/* Location pin */}
               <div className="space-y-2">
-                <Label text="Pin the exact spot" req />
+                <div className="flex items-center justify-between gap-3">
+                  <Label text="Pin the exact spot" req />
+                  <label className="flex items-center gap-2 text-xs font-medium text-gray-600 cursor-pointer select-none mb-1">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300"
+                      checked={!showCoords}
+                      onChange={(e) => setShowCoords(!e.target.checked)}
+                    />
+                    Hide coordinates
+                  </label>
+                </div>
                 <LocationPicker
                   value={pinnedLocation}
                   onChange={setPinnedLocation}
                   fallbackCenter={barangayCenter}
+                  showCoordinates={showCoords}
                 />
+                <p className="text-xs text-gray-500">
+                  {showCoords
+                    ? 'Turn on "Hide coordinates" to keep the numbers off screen. They are still saved for the map and heatmap.'
+                    : 'Coordinates are hidden from view but saved securely for authorized map and heatmap use.'}
+                </p>
                 <Err k="incident_latitude" />
               </div>
             </div>
@@ -419,7 +437,10 @@ export default function NewReportPage() {
               <Row label="Location" value={f.incident_location} />
               <Row label="Barangay" value={brgyName(f.incident_barangay_id)} />
               {f.incident_latitude && f.incident_longitude && (
-                <Row label="Coordinates" value={`${f.incident_latitude}, ${f.incident_longitude}`} />
+                <Row
+                  label="Coordinates"
+                  value={showCoords ? `${f.incident_latitude}, ${f.incident_longitude}` : 'Pinned on map (hidden)'}
+                />
               )}
             </div>
             {photos.length > 0 && (

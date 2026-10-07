@@ -82,7 +82,7 @@ export const VACCINATION_STATUS_COLORS: Record<VaccinationStatus, string> = {
 };
 
 export const CATEGORY_LABELS: Record<ExposureCategory, string> = {
-  I: 'Category I - No treatment needed',
+  I: 'Basic First Aid - Minimal Scratch',
   II: 'Category II - Wound treatment + vaccination',
   III: 'Category III - Wound treatment + vaccination + RIG',
 };
