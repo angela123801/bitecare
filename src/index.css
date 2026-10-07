@@ -84,6 +84,19 @@
     padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
   }
 
+  /* Full-height map shell. Sized to the space left after the top bar, the page
+     padding and (on phones) the fixed bottom nav, so map overlays such as the
+     legend are never hidden behind the navigation bar. */
+  .map-shell {
+    height: calc(100vh - 10rem - env(safe-area-inset-bottom, 0px));
+  }
+
+  @media (min-width: 1024px) {
+    .map-shell {
+      height: calc(100vh - 7rem);
+    }
+  }
+
   /* Keep swipe scrolling while hiding the scrollbar. */
   .no-scrollbar {
     -ms-overflow-style: none;

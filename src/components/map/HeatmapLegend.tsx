@@ -1,4 +1,6 @@
 import { HEAT_GRADIENT } from '@/lib/heatmap';
+import CollapsiblePanel from './CollapsiblePanel';
+import { Flame } from 'lucide-react';
 
 const LEGEND_STOPS = [
   { label: 'Few incidents', color: HEAT_GRADIENT[0.2] },
@@ -8,14 +10,18 @@ const LEGEND_STOPS = [
   { label: 'Very high', color: HEAT_GRADIENT[1.0] },
 ];
 
-export default function HeatmapLegend() {
+interface HeatmapLegendProps {
+  collapsed: boolean;
+  onToggle: () => void;
+}
+
+export default function HeatmapLegend({ collapsed, onToggle }: HeatmapLegendProps) {
   const gradientCss = `linear-gradient(to right, ${Object.keys(HEAT_GRADIENT)
     .map((stop) => `${HEAT_GRADIENT[Number(stop)]} ${Number(stop) * 100}%`)
     .join(', ')})`;
 
   return (
-    <div className="bg-white/95 backdrop-blur rounded-lg shadow-lg p-3 w-56">
-      <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Incident Density</p>
+    <CollapsiblePanel title="Incident Density" icon={Flame} collapsed={collapsed} onToggle={onToggle}>
       <div className="h-2.5 rounded-full" style={{ background: gradientCss }} />
       <div className="flex justify-between mt-1">
         <span className="text-[10px] text-gray-500">Low</span>
@@ -32,6 +38,6 @@ export default function HeatmapLegend() {
       <p className="text-[10px] text-gray-400 mt-2 leading-snug">
         Colour reflects how many bite reports fall in the same area, not an individual case.
       </p>
-    </div>
+    </CollapsiblePanel>
   );
 }
