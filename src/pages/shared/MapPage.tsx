@@ -16,7 +16,7 @@ import MapLegend from '@/components/map/MapLegend';
 import MapControlPanel from '@/components/map/MapControlPanel';
 import { FACILITY_COLORS, SEVERITY_COLORS } from '@/lib/mapColors';
 import type { HealthcareFacility, Severity } from '@/types';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Menu, X } from 'lucide-react';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -90,6 +90,8 @@ export default function MapPage() {
 
   const mapRef = useRef<L.Map | null>(null);
   const { reports, loading: reportsLoading, error: reportsError } = useMapReports(filters);
+
+  const activeFilters = useMemo(() => Object.values(filters).filter(Boolean).length, [filters]);
 
   const fetchReference = useCallback(async () => {
     const [facRes, brgyRes] = await Promise.all([
@@ -205,57 +207,75 @@ export default function MapPage() {
           ))}
       </MapContainer>
 
-      <MapControlPanel
-        open={controlsOpen}
-        onOpenChange={setControlsOpen}
-        filters={filters}
-        onFiltersChange={setFilters}
-        barangays={barangays}
-        resultCount={visibleReports.length}
-        loading={reportsLoading}
-        showMarkers={showMarkers}
-        showHeatmap={showHeatmap}
-        showFacilities={showFacilities}
-        onShowMarkersChange={setShowMarkers}
-        onShowHeatmapChange={setShowHeatmap}
-        onShowFacilitiesChange={setShowFacilities}
-        showLegend={showLegend}
-        onShowLegendChange={setShowLegend}
-        onLocate={handleLocate}
-        locating={locating}
-      />
-
       {/*
-        Legend stack. Anchored bottom-left and kept clear of the top-left
-        hamburger control and the top-right message stack. Hidden entirely while
-        the control sheet is open on phones, where it would be covered anyway.
+        Left control column. The ☰ toggle, the control sheet and the legend
+        stack all live in this one vertical column in normal flow, so they can
+        never overlap each other. Only the bottom part scrolls, which keeps the
+        ☰ toggle pinned directly above the control sheet at all times. Gaps
+        between cards let map drags and zoom clicks pass through.
       */}
-      {showLegend && (
-        <div
+      <div className="absolute top-28 left-3 bottom-4 z-[1000] flex flex-col items-start gap-2 w-[17rem] max-w-[calc(100vw-1.5rem)] pointer-events-none sm:top-3">
+        <button
+          type="button"
+          onClick={() => setControlsOpen((v) => !v)}
+          aria-label={controlsOpen ? 'Close map controls' : 'Open map controls'}
+          aria-expanded={controlsOpen}
           className={cn(
-            'absolute bottom-4 left-3 z-[999] flex flex-col items-start gap-2 pointer-events-none',
-            'max-h-[42vh] sm:max-h-[calc(100%-8rem)] overflow-y-auto overflow-x-hidden',
-            controlsOpen && 'hidden',
+            'pointer-events-auto flex-shrink-0 flex items-center gap-2 rounded-lg px-3 py-2.5 shadow-lg',
+            'bg-white hover:bg-gray-50 active:bg-gray-100 transition-colors',
+            controlsOpen && 'ring-2 ring-primary-500',
           )}
         >
-          <div className="pointer-events-auto">
-            <MapLegend collapsed={legendCollapsed} onToggle={() => setLegendCollapsed((v) => !v)} />
-          </div>
-          {showHeatmap && (
-            <div className="pointer-events-auto">
-              <HeatmapLegend collapsed={densityCollapsed} onToggle={() => setDensityCollapsed((v) => !v)} />
+          {controlsOpen ? <X className="w-5 h-5 text-gray-700" /> : <Menu className="w-5 h-5 text-gray-700" />}
+          <span className="text-sm font-semibold text-gray-800">Map controls</span>
+          {!controlsOpen && activeFilters > 0 && (
+            <span className="w-5 h-5 bg-primary-600 text-white text-[11px] font-bold rounded-full flex items-center justify-center">
+              {activeFilters}
+            </span>
+          )}
+        </button>
+
+        <div className="flex-1 min-h-0 w-full flex flex-col items-start gap-2 overflow-y-auto pointer-events-none">
+          {controlsOpen && (
+            <MapControlPanel
+              onClose={() => setControlsOpen(false)}
+              filters={filters}
+              onFiltersChange={setFilters}
+              barangays={barangays}
+              resultCount={visibleReports.length}
+              loading={reportsLoading}
+              showMarkers={showMarkers}
+              showHeatmap={showHeatmap}
+              showFacilities={showFacilities}
+              onShowMarkersChange={setShowMarkers}
+              onShowHeatmapChange={setShowHeatmap}
+              onShowFacilitiesChange={setShowFacilities}
+              showLegend={showLegend}
+              onShowLegendChange={setShowLegend}
+              onLocate={handleLocate}
+              locating={locating}
+            />
+          )}
+
+          {showLegend && (
+            <div className="pointer-events-auto flex-shrink-0 flex flex-col items-start gap-2">
+              <MapLegend collapsed={legendCollapsed} onToggle={() => setLegendCollapsed((v) => !v)} />
+              {showHeatmap && (
+                <HeatmapLegend collapsed={densityCollapsed} onToggle={() => setDensityCollapsed((v) => !v)} />
+              )}
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/*
         All transient messages live in one stack so they can never overlap each
-        other. Top-right on desktop (clear of the top-left controls), and below
-        the controls on phones. The wrapper ignores pointer events so the map
-        underneath stays draggable; each card re-enables them.
+        other. Top-right on desktop (clear of the top-left controls), and top on
+        phones, where the control column starts lower down. The wrapper ignores
+        pointer events so the map underneath stays draggable; each card
+        re-enables them.
       */}
-      <div className="absolute top-16 left-3 right-3 z-[1002] flex flex-col gap-2 pointer-events-none sm:top-3 sm:left-auto sm:right-3 sm:max-w-md">
+      <div className="absolute top-3 left-3 right-3 z-[1002] flex flex-col gap-2 pointer-events-none sm:left-auto sm:right-3 sm:max-w-md">
         {reportsError && (
           <div className="pointer-events-auto bg-danger-50 border border-danger-200 text-danger-700 text-sm rounded-lg px-3 py-2 shadow-lg flex items-center gap-2">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -271,7 +291,7 @@ export default function MapPage() {
         )}
 
         {!reportsLoading && !reportsError && visibleReports.length === 0 && (
-          <div className="pointer-events-auto bg-white/95 backdrop-blur rounded-lg shadow-lg px-3 py-2">
+          <div className="pointer-events-auto hidden sm:block bg-white/95 backdrop-blur rounded-lg shadow-lg px-3 py-2">
             <p className="text-xs text-gray-600">
               No mapped reports match the current filters. Reports need a pinned location to appear here.
             </p>
