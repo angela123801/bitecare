@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bitecare-v1';
+const CACHE_NAME = 'bitecare-v2';
 const PRECACHE = [
   '/',
   '/manifest.webmanifest',
@@ -7,6 +7,23 @@ const PRECACHE = [
   '/icons/icon-512.png',
   '/icons/icon-maskable-512.png',
   '/icons/apple-touch-icon.png',
+  // Health-education visuals, precached so the guides also work offline.
+  '/edu-rabies.webp',
+  '/edu-animal-bite-prevention.webp',
+  '/edu-wound-care.webp',
+  '/edu-vaccination.webp',
+  '/edu-pet-ownership.webp',
+  '/edu-seek-medical.webp',
+  '/edu-children-safety.webp',
+  '/step-put-safety-first.webp',
+  '/step-wash-wound.webp',
+  '/step-control-bleeding.webp',
+  '/step-apply-antiseptic.webp',
+  '/step-cover-wound.webp',
+  '/step-go-to-center.webp',
+  '/step-monitor.webp',
+  '/step-report.webp',
+  '/step-avoid-remedies.webp',
 ];
 
 self.addEventListener('install', (event) => {

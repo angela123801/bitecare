@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { cn, getErrorMessage } from '@/lib/utils';
 import type { FirstAidGuide, ExposureCategory } from '@/types';
 import { CATEGORY_LABELS } from '@/config/constants';
+import { firstAidStepVisual, isAvoidStep } from '@/lib/educationMedia';
 import {
   Loader2,
   AlertTriangle,
@@ -91,6 +92,16 @@ export default function FirstAidPage() {
         </div>
       </div>
 
+      {/* Reminder to get professional care */}
+      <div className="bg-warning-50 border border-warning-200 rounded-xl p-4 flex items-start gap-3">
+        <AlertTriangle className="w-5 h-5 text-warning-600 flex-shrink-0 mt-0.5" />
+        <p className="text-sm text-warning-800">
+          <strong>Always seek professional medical care after any animal bite or scratch.</strong>{' '}
+          First aid lowers your risk of infection, but it does not replace a medical assessment and
+          rabies vaccination. Go to an Animal Bite Treatment Centre or emergency room as soon as you can.
+        </p>
+      </div>
+
       {/* Category Selector */}
       <div className="space-y-2">
         <p className="text-sm font-medium text-gray-700">Select wound category:</p>
@@ -150,19 +161,54 @@ export default function FirstAidPage() {
 
                 {isExpanded && (
                   <div className="border-t px-4 pb-4 space-y-4">
-                    {/* Steps */}
+                    {/* Steps — each step keeps its full written instruction and
+                        gains an illustration plus a Do This / Avoid This tag. */}
                     <div className="pt-4 space-y-3">
-                      {guide.steps.map((step, i) => (
-                        <div key={i} className="flex gap-3">
-                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-                            <span className="text-sm font-bold text-primary-700">{i + 1}</span>
+                      {guide.steps.map((step, i) => {
+                        const visual = firstAidStepVisual(step);
+                        const avoid = isAvoidStep(step.title);
+                        return (
+                          <div
+                            key={i}
+                            className={cn(
+                              'flex gap-3 rounded-xl border p-3',
+                              avoid ? 'border-danger-200 bg-danger-50/40' : 'border-gray-100 bg-gray-50/60',
+                            )}
+                          >
+                            <img
+                              src={visual.src}
+                              alt={visual.alt}
+                              width={420}
+                              height={420}
+                              loading="lazy"
+                              decoding="async"
+                              className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg object-cover flex-shrink-0 bg-white border border-gray-100"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span
+                                  className={cn(
+                                    'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
+                                    avoid ? 'bg-danger-100 text-danger-700' : 'bg-primary-100 text-primary-700',
+                                  )}
+                                >
+                                  {i + 1}
+                                </span>
+                                <span
+                                  className={cn(
+                                    'text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full',
+                                    avoid ? 'bg-danger-100 text-danger-700' : 'bg-success-100 text-success-700',
+                                  )}
+                                >
+                                  {avoid ? 'Avoid this' : 'Do this'}
+                                </span>
+                              </div>
+                              <p className="text-sm font-semibold text-gray-900 mt-1.5">{step.title}</p>
+                              <p className="text-sm text-gray-600 mt-0.5">{step.description}</p>
+                            </div>
                           </div>
-                          <div className="pt-1">
-                            <p className="text-sm font-medium text-gray-900">{step.title}</p>
-                            <p className="text-sm text-gray-600 mt-0.5">{step.description}</p>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     {/* Warnings */}

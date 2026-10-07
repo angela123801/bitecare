@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatDate, cn, getErrorMessage } from '@/lib/utils';
 import type { EducationContent } from '@/types';
+import { educationVisual } from '@/lib/educationMedia';
 import { BookOpen, ArrowLeft, Loader2, Search } from 'lucide-react';
 
 export default function EducationPage() {
@@ -64,6 +65,9 @@ export default function EducationPage() {
 
   // Article Detail View
   if (selectedArticle) {
+    const visual = educationVisual(selectedArticle);
+    const heroSrc = selectedArticle.cover_image_url || visual.src;
+    const heroAlt = selectedArticle.cover_image_url ? selectedArticle.title : visual.alt;
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
         <button
@@ -73,13 +77,13 @@ export default function EducationPage() {
           <ArrowLeft className="w-4 h-4" /> Back to articles
         </button>
 
-        {selectedArticle.cover_image_url && (
-          <img
-            src={selectedArticle.cover_image_url}
-            alt={selectedArticle.title}
-            className="w-full h-56 object-cover rounded-xl mb-6"
-          />
-        )}
+        <img
+          src={heroSrc}
+          alt={heroAlt}
+          width={900}
+          height={502}
+          className="w-full h-48 sm:h-64 lg:h-72 object-cover rounded-xl mb-6 bg-primary-50"
+        />
 
         <div className="space-y-4">
           <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
@@ -145,23 +149,23 @@ export default function EducationPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map((article) => (
+          {filtered.map((article) => {
+            const visual = educationVisual(article);
+            return (
             <button
               key={article.id}
               onClick={() => setSelectedArticle(article)}
               className="text-left bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md hover:border-primary-200 transition-all group"
             >
-              {article.cover_image_url ? (
-                <img
-                  src={article.cover_image_url}
-                  alt={article.title}
-                  className="w-full h-40 object-cover group-hover:scale-105 transition-transform"
-                />
-              ) : (
-                <div className="w-full h-40 bg-gradient-to-br from-primary-100 to-accent-100 flex items-center justify-center">
-                  <BookOpen className="w-10 h-10 text-primary-400" />
-                </div>
-              )}
+              <img
+                src={article.cover_image_url || visual.src}
+                alt={article.cover_image_url ? article.title : visual.alt}
+                width={900}
+                height={502}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-40 object-cover bg-primary-50 group-hover:scale-105 transition-transform"
+              />
               <div className="p-4 space-y-2">
                 <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 capitalize">
                   {article.category}
@@ -172,7 +176,8 @@ export default function EducationPage() {
                 <p className="text-gray-500 text-xs line-clamp-2">{article.summary}</p>
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
