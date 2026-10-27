@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import type { Barangay } from '@/types';
 import { getErrorMessage, normalizePhMobile, isValidPhMobile } from '@/lib/utils';
 import { useIsMobile } from '@/lib/useIsMobile';
+import { BETA_TESTING } from '@/config/constants';
 import {
   Eye, EyeOff, Loader2, ChevronDown, AlertCircle, Lock,
   Phone, Mail, User as UserIcon, MapPin, CheckCircle2, Home,
@@ -13,6 +14,7 @@ import InstallAppButton from '@/components/auth/InstallAppButton';
 import {
   sendOtp,
   verifyOtp,
+  betaVerify,
   allowedChannelsForRole,
   otpDeliveryMessage,
   OtpError,
@@ -131,6 +133,14 @@ export default function RegisterPage() {
 
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Account was created but no session was established.');
+
+      if (BETA_TESTING) {
+        // Beta mode: skip SMS OTP. Activate the account immediately. The
+        // password the user just set is still required to sign in later.
+        await betaVerify();
+        setStep('done');
+        return;
+      }
 
       // SMS is the only verification method, for every role.
       const permitted = allowedChannelsForRole();

@@ -10,12 +10,14 @@ import OtpPanel from '@/components/auth/OtpPanel';
 import {
   sendOtp,
   verifyOtp,
+  betaLogin,
   otpDeliveryMessage,
   OtpError,
   type OtpChannel,
   type OtpChannelOption,
 } from '@/lib/otp';
 import { normalizePhMobile, isValidPhMobile } from '@/lib/utils';
+import { BETA_TESTING } from '@/config/constants';
 
 export default function LoginPage() {
   const { applySession, signOut } = useAuth();
@@ -93,6 +95,24 @@ export default function LoginPage() {
     setIdentifier(id);
     setLoading(true);
     try {
+      if (BETA_TESTING) {
+        // Beta mode: skip SMS OTP. The server still checks the password and
+        // resolves the account before issuing a session — wrong credentials
+        // are rejected exactly as in the normal flow.
+        const result = await betaLogin({ identifier: id, password });
+        if (!result.access_token || !result.refresh_token) {
+          throw new OtpError('Could not start your session. Please try again.');
+        }
+        const profile = await applySession(result.access_token, result.refresh_token);
+        if (preselectedRole && profile && profile.role !== preselectedRole) {
+          await signOut();
+          setError(`${ROLE_MISMATCH_MESSAGE} This is a ${ROLE_LABELS[profile.role]} account.`);
+          return;
+        }
+        navigate('/dashboard', { replace: true });
+        return;
+      }
+
       // Send the code immediately. The server resolves the account, checks the
       // password and sends the SMS in a single request, so there is no extra
       // round trip before the message goes out. SMS is the only method, for
@@ -315,8 +335,8 @@ export default function LoginPage() {
               to="/register"
               className="group w-full flex items-center gap-3 rounded-2xl bg-white/95 backdrop-blur-md border border-white/30 p-4 transition-all duration-300 hover:shadow-2xl hover:-translate-y-0.5"
             >
-              <span className="w-11 h-11 rounded-xl bg-amber-50 group-hover:bg-amber-100 flex items-center justify-center flex-shrink-0 transition-colors">
-                <UserPlus className="w-5 h-5 text-amber-600" />
+              <span className="w-11 h-11 rounded-xl bg-accent-100 group-hover:bg-accent-200 flex items-center justify-center flex-shrink-0 transition-colors">
+                <UserPlus className="w-5 h-5 text-accent-700" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-bold text-gray-900">Register as Resident</span>

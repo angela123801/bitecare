@@ -18,33 +18,33 @@ const roles: RoleCard[] = [
   {
     role: 'super_admin',
     icon: <Shield className="w-8 h-8" />,
-    color: 'text-rose-600',
-    bgColor: 'bg-rose-50 group-hover:bg-rose-100',
-    borderColor: 'border-rose-200 group-hover:border-rose-300',
+    color: 'text-primary-700',
+    bgColor: 'bg-primary-50 group-hover:bg-primary-100',
+    borderColor: 'border-primary-200 group-hover:border-primary-300',
     description: 'Full system control, analytics, and account management',
   },
   {
     role: 'admin',
     icon: <UserCog className="w-8 h-8" />,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50 group-hover:bg-blue-100',
-    borderColor: 'border-blue-200 group-hover:border-blue-300',
+    color: 'text-accent-800',
+    bgColor: 'bg-accent-100 group-hover:bg-accent-200',
+    borderColor: 'border-accent-200 group-hover:border-accent-300',
     description: 'Manage users, facilities, reports and education',
   },
   {
     role: 'health_worker',
     icon: <Stethoscope className="w-8 h-8" />,
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50 group-hover:bg-emerald-100',
-    borderColor: 'border-emerald-200 group-hover:border-emerald-300',
+    color: 'text-primary-600',
+    bgColor: 'bg-primary-50 group-hover:bg-primary-100',
+    borderColor: 'border-primary-200 group-hover:border-primary-300',
     description: 'Patient care, vaccinations and appointments',
   },
   {
     role: 'user',
     icon: <User className="w-8 h-8" />,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-50 group-hover:bg-amber-100',
-    borderColor: 'border-amber-200 group-hover:border-amber-300',
+    color: 'text-accent-700',
+    bgColor: 'bg-accent-100 group-hover:bg-accent-200',
+    borderColor: 'border-accent-200 group-hover:border-accent-300',
     description: 'Report bites and track your treatment records',
   },
 ];
@@ -106,8 +106,8 @@ export default function RoleSelectionPage() {
               onClick={() => navigate('/register')}
               className="group w-full flex items-center gap-4 bg-white/95 backdrop-blur-md rounded-2xl border-2 border-white/30 p-5 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:-translate-y-1"
             >
-              <div className="w-14 h-14 rounded-2xl bg-amber-50 group-hover:bg-amber-100 flex items-center justify-center flex-shrink-0 transition-colors">
-                <User className="w-8 h-8 text-amber-600" />
+              <div className="w-14 h-14 rounded-2xl bg-accent-100 group-hover:bg-accent-200 flex items-center justify-center flex-shrink-0 transition-colors">
+                <User className="w-8 h-8 text-accent-700" />
               </div>
               <span className="min-w-0 flex-1">
                 <span className="block text-lg font-bold text-gray-900">Register as Resident</span>

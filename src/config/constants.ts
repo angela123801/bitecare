@@ -1,5 +1,13 @@
 import type { UserRole, ReportStatus, Severity, AnimalType, VaccinationStatus, ExposureCategory } from '@/types';
 
+/**
+ * BETA_TESTING — when true, SMS OTP verification is skipped for login and
+ * registration. Valid credentials are still required; the server still
+ * checks the password and resolves the account. No SMS is sent while this
+ * is on. Set to false to restore the original OTP flow. NOT for production.
+ */
+export const BETA_TESTING = true;
+
 export const APP_NAME = 'BiteCare';
 export const APP_DESCRIPTION = 'Animal Bite Management & Monitoring System';
 export const CITY = 'Bacolod City';

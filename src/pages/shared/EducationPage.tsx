@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { formatDate, cn, getErrorMessage } from '@/lib/utils';
 import type { EducationContent } from '@/types';
 import { educationVisual } from '@/lib/educationMedia';
+import { MarkdownContent } from '@/lib/markdown';
 import { BookOpen, ArrowLeft, Loader2, Search } from 'lucide-react';
 
 export default function EducationPage() {
@@ -92,8 +93,8 @@ export default function EducationPage() {
           <h1 className="text-3xl font-bold text-gray-900">{selectedArticle.title}</h1>
           <p className="text-gray-500 text-sm">{formatDate(selectedArticle.created_at)}</p>
           <hr />
-          <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
-            {selectedArticle.content}
+          <div className="prose prose-sm max-w-none text-gray-700">
+            <MarkdownContent content={selectedArticle.content} />
           </div>
         </div>
       </div>

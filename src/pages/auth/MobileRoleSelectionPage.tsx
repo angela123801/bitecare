@@ -52,8 +52,8 @@ export default function MobileRoleSelectionPage() {
             onClick={() => navigate('/login?role=user')}
             className="group w-full flex items-center gap-4 bg-white/95 backdrop-blur-md rounded-2xl border-2 border-white/30 p-5 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:-translate-y-1"
           >
-            <div className="w-14 h-14 rounded-2xl bg-amber-50 group-hover:bg-amber-100 flex items-center justify-center flex-shrink-0 transition-colors">
-              <User className="w-7 h-7 text-amber-600" />
+            <div className="w-14 h-14 rounded-2xl bg-accent-100 group-hover:bg-accent-200 flex items-center justify-center flex-shrink-0 transition-colors">
+              <User className="w-7 h-7 text-accent-700" />
             </div>
             <span className="min-w-0 flex-1">
               <span className="block text-lg font-bold text-gray-900">Resident/User</span>
@@ -66,8 +66,8 @@ export default function MobileRoleSelectionPage() {
             onClick={() => navigate('/login?role=health_worker')}
             className="group w-full flex items-center gap-4 bg-white/95 backdrop-blur-md rounded-2xl border-2 border-white/30 p-5 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:-translate-y-1"
           >
-            <div className="w-14 h-14 rounded-2xl bg-emerald-50 group-hover:bg-emerald-100 flex items-center justify-center flex-shrink-0 transition-colors">
-              <Stethoscope className="w-7 h-7 text-emerald-600" />
+            <div className="w-14 h-14 rounded-2xl bg-primary-50 group-hover:bg-primary-100 flex items-center justify-center flex-shrink-0 transition-colors">
+              <Stethoscope className="w-7 h-7 text-primary-600" />
             </div>
             <span className="min-w-0 flex-1">
               <span className="block text-lg font-bold text-gray-900">Health Worker / Staff</span>

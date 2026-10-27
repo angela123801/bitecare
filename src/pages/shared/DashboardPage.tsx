@@ -42,7 +42,7 @@ function StatsCard({ label, value, icon, color, to }: { label: string; value: nu
   );
   if (to) {
     return (
-      <Link to={to} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 block hover:border-teal-300 hover:shadow-md transition-all">
+      <Link to={to} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 block hover:border-primary-300 hover:shadow-md transition-all">
         {body}
       </Link>
     );
@@ -57,13 +57,13 @@ function QuickAction({ to, icon, label }: { to: string; icon: React.ReactNode; l
   return (
     <Link
       to={to}
-      className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 shadow-sm p-4 hover:border-teal-300 hover:shadow-md transition-all group"
+      className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 shadow-sm p-4 hover:border-primary-300 hover:shadow-md transition-all group"
     >
-      <div className="w-10 h-10 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center group-hover:bg-teal-100 transition-colors">
+      <div className="w-10 h-10 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center group-hover:bg-primary-100 transition-colors">
         {icon}
       </div>
-      <span className="text-sm font-semibold text-gray-700 group-hover:text-teal-700 transition-colors">{label}</span>
-      <ChevronRight className="w-4 h-4 text-gray-400 ml-auto group-hover:text-teal-500 transition-colors" />
+      <span className="text-sm font-semibold text-gray-700 group-hover:text-primary-700 transition-colors">{label}</span>
+      <ChevronRight className="w-4 h-4 text-gray-400 ml-auto group-hover:text-primary-500 transition-colors" />
     </Link>
   );
 }
@@ -199,7 +199,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
       </div>
     );
   }
@@ -234,28 +234,28 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {role === 'user' && (
           <>
-            <StatsCard label="My Reports" value={stats.myReports ?? 0} icon={<FileText className="w-5 h-5 text-white" />} color="bg-teal-600" to="/my-reports" />
-            <StatsCard label="Active Cases" value={stats.activeCases ?? 0} icon={<AlertTriangle className="w-5 h-5 text-white" />} color="bg-amber-500" />
-            <StatsCard label="Upcoming Vaccinations" value={stats.upcomingVaccinations ?? 0} icon={<Syringe className="w-5 h-5 text-white" />} color="bg-sky-500" />
+            <StatsCard label="My Reports" value={stats.myReports ?? 0} icon={<FileText className="w-5 h-5 text-white" />} color="bg-primary-600" to="/my-reports" />
+            <StatsCard label="Active Cases" value={stats.activeCases ?? 0} icon={<AlertTriangle className="w-5 h-5 text-white" />} color="bg-warning-500" />
+            <StatsCard label="Upcoming Vaccinations" value={stats.upcomingVaccinations ?? 0} icon={<Syringe className="w-5 h-5 text-white" />} color="bg-accent-600" />
           </>
         )}
         {role === 'health_worker' && (
           <>
-            <StatsCard label="Assigned Cases" value={stats.assignedCases ?? 0} icon={<ClipboardList className="w-5 h-5 text-white" />} color="bg-teal-600" to="/cases" />
-            <StatsCard label="Today's Vaccinations" value={stats.todayVaccinations ?? 0} icon={<CalendarCheck className="w-5 h-5 text-white" />} color="bg-sky-500" />
-            <StatsCard label="Overdue Follow-ups" value={stats.overdueFollowups ?? 0} icon={<Clock className="w-5 h-5 text-white" />} color="bg-red-500" />
+            <StatsCard label="Assigned Cases" value={stats.assignedCases ?? 0} icon={<ClipboardList className="w-5 h-5 text-white" />} color="bg-primary-600" to="/cases" />
+            <StatsCard label="Today's Vaccinations" value={stats.todayVaccinations ?? 0} icon={<CalendarCheck className="w-5 h-5 text-white" />} color="bg-accent-600" />
+            <StatsCard label="Overdue Follow-ups" value={stats.overdueFollowups ?? 0} icon={<Clock className="w-5 h-5 text-white" />} color="bg-danger-500" />
           </>
         )}
         {(role === 'admin' || role === 'super_admin') && (
           <>
-            <StatsCard label="Total Reports" value={stats.totalReports ?? 0} icon={<FileText className="w-5 h-5 text-white" />} color="bg-teal-600" to="/admin/reports" />
-            <StatsCard label="Pending Reports" value={stats.pendingReports ?? 0} icon={<AlertTriangle className="w-5 h-5 text-white" />} color="bg-amber-500" />
-            <StatsCard label="Active Cases" value={stats.activeCases ?? 0} icon={<Activity className="w-5 h-5 text-white" />} color="bg-sky-500" />
-            <StatsCard label="Total Users" value={stats.totalUsers ?? 0} icon={<Users className="w-5 h-5 text-white" />} color="bg-blue-600" to="/admin/users" />
+            <StatsCard label="Total Reports" value={stats.totalReports ?? 0} icon={<FileText className="w-5 h-5 text-white" />} color="bg-primary-600" to="/admin/reports" />
+            <StatsCard label="Pending Reports" value={stats.pendingReports ?? 0} icon={<AlertTriangle className="w-5 h-5 text-white" />} color="bg-warning-500" />
+            <StatsCard label="Active Cases" value={stats.activeCases ?? 0} icon={<Activity className="w-5 h-5 text-white" />} color="bg-accent-600" />
+            <StatsCard label="Total Users" value={stats.totalUsers ?? 0} icon={<Users className="w-5 h-5 text-white" />} color="bg-accent-800" to="/admin/users" />
             {role === 'super_admin' && (
               <>
-                <StatsCard label="Healthcare Facilities" value={stats.totalFacilities ?? 0} icon={<Building2 className="w-5 h-5 text-white" />} color="bg-teal-500" />
-                <StatsCard label="Audit Events (7d)" value={stats.weeklyAuditEvents ?? 0} icon={<ShieldCheck className="w-5 h-5 text-white" />} color="bg-slate-600" />
+                <StatsCard label="Healthcare Facilities" value={stats.totalFacilities ?? 0} icon={<Building2 className="w-5 h-5 text-white" />} color="bg-accent-600" />
+                <StatsCard label="Audit Events (7d)" value={stats.weeklyAuditEvents ?? 0} icon={<ShieldCheck className="w-5 h-5 text-white" />} color="bg-accent-700" />
               </>
             )}
           </>
@@ -290,7 +290,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold text-gray-900">
             {role === 'health_worker' ? 'Recent Assigned Cases' : 'Recent Reports'}
           </h2>
-          <Link to={role === 'user' ? '/my-reports' : role === 'health_worker' ? '/cases' : '/admin/reports'} className="text-sm font-medium text-teal-600 hover:text-teal-700 flex items-center gap-1">
+          <Link to={role === 'user' ? '/my-reports' : role === 'health_worker' ? '/cases' : '/admin/reports'} className="text-sm font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1">
             View all <ChevronRight className="w-4 h-4" />
           </Link>
         </div>

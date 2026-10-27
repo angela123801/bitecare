@@ -26,8 +26,8 @@ export class ErrorBoundary extends Component<Props, State> {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 max-w-lg w-full p-8">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
+            <div className="w-10 h-10 rounded-xl bg-danger-50 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-danger-600" />
             </div>
             <h1 className="text-lg font-bold text-gray-900">
               {isMissingEnv ? 'Configuration Required' : 'Something went wrong'}
@@ -51,7 +51,7 @@ export class ErrorBoundary extends Component<Props, State> {
           ) : (
             <div className="space-y-3">
               <p className="text-sm text-gray-600">An unexpected error prevented the app from loading.</p>
-              <div className="bg-red-50 rounded-lg p-4 text-xs text-red-700 font-mono break-words">
+              <div className="bg-danger-50 rounded-lg p-4 text-xs text-danger-700 font-mono break-words">
                 {error.message}
               </div>
               <button

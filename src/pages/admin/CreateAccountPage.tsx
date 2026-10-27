@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { ROLE_LABELS } from '@/config/constants';
+import { ROLE_LABELS, BETA_TESTING } from '@/config/constants';
 import { createAccount, rolesForCreator, ROLE_OPTIONS, type CreateAccountResult } from '@/lib/accounts';
 import type { UserRole } from '@/types';
 import OtpVerificationModal from '@/components/admin/OtpVerificationModal';
@@ -49,7 +49,7 @@ export default function CreateAccountPage() {
     if (!form.email.trim() || !form.email.includes('@')) { setError('A valid email address is required.'); return; }
     if (!allowedRoles.includes(form.role)) { setError('You are not allowed to create that role.'); return; }
     const normalizedPhone = form.phone.replace(/[^0-9]/g, '').replace(/^63/, '0');
-    if (!isSuperAdmin && form.requireVerification && !/^0\d{10}$/.test(normalizedPhone)) {
+    if (!isSuperAdmin && !BETA_TESTING && form.requireVerification && !/^0\d{10}$/.test(normalizedPhone)) {
       setError('A valid mobile number (for example 09171234567) is required because the verification code is sent by SMS.');
       return;
     }
@@ -62,13 +62,14 @@ export default function CreateAccountPage() {
 
     setSaving(true);
     try {
+      const requireVerification = BETA_TESTING ? false : (isSuperAdmin ? false : form.requireVerification);
       const created = await createAccount({
         email: form.email.trim(),
         fullName: form.fullName.trim(),
         phone: form.phone.trim(),
         role: form.role,
         password,
-        requireVerification: isSuperAdmin ? false : form.requireVerification,
+        requireVerification,
       });
       setResult(created);
       if (created.requires_verification) {
@@ -224,7 +225,7 @@ export default function CreateAccountPage() {
                       onChange={set('phone')}
                       className="input-field pl-9"
                       placeholder="09XX XXX XXXX"
-                      required={form.role === 'user' || (!isSuperAdmin && form.requireVerification)}
+                      required={form.role === 'user' || (!isSuperAdmin && !BETA_TESTING && form.requireVerification)}
                     />
                   </div>
                 </div>
@@ -248,7 +249,7 @@ export default function CreateAccountPage() {
                         value={opt.value}
                         checked={form.role === opt.value}
                         onChange={set('role')}
-                        className="mt-0.5 accent-teal-600"
+                        className="mt-0.5 accent-danger-600"
                       />
                       <span>
                         <span className="block text-sm font-semibold text-gray-900">{opt.label}</span>
@@ -339,7 +340,7 @@ export default function CreateAccountPage() {
                     type="checkbox"
                     checked={form.requireVerification}
                     onChange={set('requireVerification')}
-                    className="mt-0.5 accent-teal-600"
+                    className="mt-0.5 accent-danger-600"
                   />
                   <span>
                     <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">

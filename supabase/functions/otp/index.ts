@@ -561,6 +561,54 @@ Deno.serve(async (req: Request) => {
     }
 
     // ------------------------------------------------------------------
+    // Beta testing: skip SMS OTP for login. The password is still checked
+    // against the real auth server, and the account is resolved exactly as
+    // in the normal send flow. No code is created or sent. Reversible by
+    // removing the BETA_TESTING flag on the client (which switches the
+    // frontend back to the send/verify path).
+    // ------------------------------------------------------------------
+    if (action === 'beta_login') {
+      const identifier = String(body.identifier ?? '').trim();
+      const password = String(body.password ?? '');
+      if (!identifier || !password) return json({ error: 'Enter your sign-in ID and password' }, 400);
+
+      const { data: resolved, error: resolveErr } = await adminClient.rpc('get_user_by_login_id', {
+        p_login_id: identifier,
+      });
+      if (resolveErr) return json({ error: 'Could not complete sign-in' }, 500);
+      const r = resolved as Record<string, unknown>;
+      if (r?.error) return json({ error: 'Invalid sign-in ID or password' }, 401);
+      if (r.is_active === false) {
+        return json({ error: 'This account is deactivated. Contact an administrator.' }, 403);
+      }
+
+      const loginEmail = String(r.auth_email ?? r.email);
+      const session = await checkPassword(loginEmail, password);
+      if (!session) return json({ error: 'Invalid sign-in ID or password' }, 401);
+
+      return json({
+        ok: true,
+        purpose: 'login',
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+    }
+
+    // ------------------------------------------------------------------
+    // Beta testing: skip SMS OTP for registration verification. The caller
+    // must be signed in (the registration flow creates the account first),
+    // and the account is activated immediately with mark_account_verified.
+    // No code is created or sent.
+    // ------------------------------------------------------------------
+    if (action === 'beta_verify') {
+      const caller = await getCaller(req);
+      if (!caller) return json({ error: 'Please sign in again to continue' }, 401);
+
+      await adminClient.rpc('mark_account_verified', { p_user_id: caller.id });
+      return json({ ok: true, purpose: 'verification', user_id: caller.id });
+    }
+
+    // ------------------------------------------------------------------
     // Verify a code
     // ------------------------------------------------------------------
     if (action === 'verify') {

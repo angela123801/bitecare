@@ -1,0 +1,13 @@
+{
+  "projectId": "71345058",
+  "functions": {
+    "account-admin": {
+      "hasChanged": false,
+      "hash": "e79f83c737b11f13a0c24dfdf77e1858e38aed884f77335ea43b8531a0616b9e"
+    },
+    "otp": {
+      "hasChanged": false,
+      "hash": "bd0ef8b9b298e00d212fae5c794265822f01a8a22c256b21ac937a5f0100aae7"
+    }
+  }
+}

@@ -32,6 +32,18 @@ export default function AnalyticsPage() {
       supabase.from('vaccination_records').select('status'),
     ]);
 
+    if (reports.error || vaccinations.error || users.error || facilities.error) {
+      setError(
+        reports.error?.message ||
+        vaccinations.error?.message ||
+        users.error?.message ||
+        facilities.error?.message ||
+        'Failed to load analytics'
+      );
+      setLoading(false);
+      return;
+    }
+
     const allReports = reports.data ?? [];
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -61,18 +73,6 @@ export default function AnalyticsPage() {
     const allVacc = vaccinations.data ?? [];
     const completed = allVacc.filter(v => v.status === 'completed').length;
     const vaccinationRate = allVacc.length > 0 ? Math.round((completed / allVacc.length) * 100) : 0;
-
-    if (reports.error || vaccinations.error || users.error || facilities.error) {
-      setError(
-        reports.error?.message ||
-        vaccinations.error?.message ||
-        users.error?.message ||
-        facilities.error?.message ||
-        'Failed to load analytics'
-      );
-      setLoading(false);
-      return;
-    }
 
     setStats({
       totalReports: allReports.length,
@@ -165,7 +165,7 @@ export default function AnalyticsPage() {
               <svg viewBox="0 0 36 36" className="w-full h-full">
                 <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#e5e7eb" strokeWidth="3" />
                 <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none" stroke="#14b8a6" strokeWidth="3"
+                  fill="none" stroke="#dc2626" strokeWidth="3"
                   strokeDasharray={`${stats.vaccinationRate}, 100`} strokeLinecap="round" />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">

@@ -140,3 +140,19 @@ export function verifyOtp(input: {
 }): Promise<OtpVerifyResult> {
   return call<OtpVerifyResult>({ action: 'verify', ...input });
 }
+
+// --- Beta testing shortcuts -------------------------------------------
+// These hit the same edge function but skip OTP entirely. The server still
+// checks the password (beta_login) and activates the account (beta_verify).
+// They are only called when BETA_TESTING is true on the client.
+
+export function betaLogin(input: {
+  identifier: string;
+  password: string;
+}): Promise<OtpVerifyResult> {
+  return call<OtpVerifyResult>({ action: 'beta_login', ...input });
+}
+
+export function betaVerify(): Promise<OtpVerifyResult> {
+  return call<OtpVerifyResult>({ action: 'beta_verify' });
+}
