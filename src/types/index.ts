@@ -27,6 +27,8 @@ export interface Barangay {
   created_at: string;
 }
 
+export type FacilityVerificationStatus = 'verified' | 'unverified' | 'needs_review';
+
 export interface HealthcareFacility {
   id: string;
   name: string;
@@ -40,6 +42,10 @@ export interface HealthcareFacility {
   operating_hours: string;
   services: string[];
   is_active: boolean;
+  verification_status: FacilityVerificationStatus;
+  source: string;
+  is_abtc: boolean;
+  verified_at: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;

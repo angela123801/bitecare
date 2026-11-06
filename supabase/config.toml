@@ -83,3 +83,8 @@ verify_jwt = false
 
 [functions.otp]
 verify_jwt = false
+
+# Public, read-only map helper: geocoding search and route lookup.
+# Touches no user data, so no JWT is required.
+[functions.facility-geo]
+verify_jwt = false

@@ -8,6 +8,10 @@
     "otp": {
       "hasChanged": false,
       "hash": "bd0ef8b9b298e00d212fae5c794265822f01a8a22c256b21ac937a5f0100aae7"
+    },
+    "facility-geo": {
+      "hasChanged": false,
+      "hash": "92c55324d3c2fee0c05daeaa5e7f5985e9d72f8100b8f8bdee7e9ec8d790d34c"
     }
   }
 }

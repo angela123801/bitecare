@@ -1,4 +1,4 @@
-import type { UserRole, ReportStatus, Severity, AnimalType, VaccinationStatus, ExposureCategory } from '@/types';
+import type { UserRole, ReportStatus, Severity, AnimalType, VaccinationStatus, ExposureCategory, FacilityVerificationStatus } from '@/types';
 
 /**
  * BETA_TESTING — when true, SMS OTP verification is skipped for login and
@@ -104,6 +104,29 @@ export const FACILITY_TYPE_LABELS: Record<string, string> = {
   vaccination_center: 'Vaccination Center',
   veterinary_clinic: 'Veterinary Clinic',
 };
+
+/** Plain-word descriptions used on the facility information card. */
+export const FACILITY_TYPE_DESCRIPTIONS: Record<string, string> = {
+  animal_bite_center: 'Registered Animal Bite Treatment Center',
+  health_center: 'Barangay health center',
+  hospital: 'Hospital',
+  vaccination_center: 'Vaccination center',
+  veterinary_clinic: 'Veterinary clinic',
+};
+
+export const FACILITY_VERIFICATION_LABELS: Record<FacilityVerificationStatus, string> = {
+  verified: 'Verified',
+  needs_review: 'Needs review',
+  unverified: 'Unverified',
+};
+
+/** Category filter options for the facility directory, in display order. */
+export const FACILITY_CATEGORY_FILTERS: { value: string; label: string }[] = [
+  { value: '', label: 'All facilities' },
+  { value: 'animal_bite_center', label: 'Animal Bite Centers' },
+  { value: 'health_center', label: 'Health Centers' },
+  { value: 'hospital', label: 'Hospitals' },
+];
 
 export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];

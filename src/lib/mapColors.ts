@@ -10,9 +10,9 @@ export const SEVERITY_COLORS: Record<Severity, string> = {
 
 /** Marker tint per healthcare facility type. */
 export const FACILITY_COLORS: Record<string, string> = {
-  hospital: '#dc2626',
+  animal_bite_center: '#dc2626',
   health_center: '#2563eb',
-  animal_bite_center: '#d97706',
-  vaccination_center: '#16a34a',
-  veterinary_clinic: '#0f766e',
+  hospital: '#16a34a',
+  vaccination_center: '#0d9488',
+  veterinary_clinic: '#a16207',
 };
