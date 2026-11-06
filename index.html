@@ -2,17 +2,85 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Primary search metadata -->
+    <title>BiteCare — Animal Bite Monitoring &amp; Rabies Prevention | Bacolod City</title>
+    <meta
+      name="description"
+      content="BiteCare is an animal bite management and monitoring system for Bacolod City. Report a bite, find the nearest animal bite treatment center, track rabies vaccination schedules, and follow first-aid guidance."
+    />
+    <link rel="canonical" href="https://bitecare.com/" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="theme-color" content="#0f766e" />
+    <meta name="author" content="BiteCare" />
+
+    <!-- Icons and installable app -->
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>BiteCare: A Mobile &amp; Web Application Animal Bite Management for Monitoring System &amp; Decision Support System</title>
-    <meta name="description" content="BiteCare: A Mobile &amp; Web Application Animal Bite Management for Monitoring System &amp; Decision Support System" />
-    <meta name="theme-color" content="#0f766e" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="BiteCare" />
+
+    <!-- Open Graph (Facebook, Messenger, Viber, LinkedIn) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="BiteCare" />
+    <meta property="og:title" content="BiteCare — Animal Bite Monitoring &amp; Rabies Prevention" />
+    <meta
+      property="og:description"
+      content="Report animal bites, find the nearest treatment center, and track rabies vaccination schedules in Bacolod City."
+    />
+    <meta property="og:url" content="https://bitecare.com/" />
+    <meta property="og:image" content="https://bitecare.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="BiteCare — animal bite monitoring and rabies prevention for Bacolod City"
+    />
+    <meta property="og:locale" content="en_PH" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="BiteCare — Animal Bite Monitoring &amp; Rabies Prevention" />
+    <meta
+      name="twitter:description"
+      content="Report animal bites, find the nearest treatment center, and track rabies vaccination schedules in Bacolod City."
+    />
+    <meta name="twitter:image" content="https://bitecare.com/og-image.png" />
+
+    <!-- Structured data for search engines -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "BiteCare",
+        "alternateName": "BiteCare Animal Bite Management and Monitoring System",
+        "url": "https://bitecare.com/",
+        "applicationCategory": "HealthApplication",
+        "operatingSystem": "Web, Android, iOS",
+        "inLanguage": "en-PH",
+        "description": "An animal bite management, monitoring and decision support system for Bacolod City: bite reporting, treatment center locations, rabies vaccination tracking and first-aid guidance.",
+        "areaServed": {
+          "@type": "City",
+          "name": "Bacolod City",
+          "address": {
+            "@type": "PostalAddress",
+            "addressRegion": "Negros Occidental",
+            "addressCountry": "PH"
+          }
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "BiteCare",
+          "url": "https://bitecare.com/",
+          "logo": "https://bitecare.com/logo.png"
+        }
+      }
+    </script>
+
     <script>
       // Capture the browser's install prompt as early as possible. The prompt
       // fires once, shortly after load, so a listener attached later inside the
@@ -29,10 +97,7 @@
         window.__bitecareInstallListeners.forEach(function (listener) { listener(false); });
       });
     </script>
-    <meta property="og:image" content="/logo.png">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:image" content="/logo.png">
-</head>
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

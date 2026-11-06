@@ -1,0 +1,36 @@
+# BiteCare — robots.txt
+#
+# Public pages may be indexed. Signed-in areas are listed as disallowed so
+# crawlers do not request them, even though the app also refuses to render
+# them without a session.
+#
+# The Disallow entries are defence in depth, not the access control: every
+# protected route requires a signed-in session and the database enforces its
+# own access rules, so no patient record, report or personal detail is
+# readable without one.
+
+User-agent: *
+Allow: /$
+
+# Public, crawlable pages
+Allow: /login
+Allow: /register
+Allow: /reset-password
+
+# Signed-in areas — never indexed
+Disallow: /roles
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /notifications
+Disallow: /my-reports
+Disallow: /my-vaccinations
+Disallow: /reports
+Disallow: /cases
+Disallow: /vaccinations
+Disallow: /appointments
+Disallow: /map
+Disallow: /education
+Disallow: /first-aid
+Disallow: /admin
+
+Sitemap: https://bitecare.com/sitemap.xml

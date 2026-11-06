@@ -496,6 +496,56 @@ No `404.html` is generated, which is what lets Cloudflare Pages serve the app ro
 unmatched paths (the SPA fallback). Do not add a `/* /index.html 200` rule to
 `_redirects`; Cloudflare rejects it as an infinite loop.
 
+**Custom domain (bitecare.com)**
+
+The app serves correctly from any host name; nothing in the build depends on the domain.
+Search metadata uses `https://bitecare.com` as the canonical address, so point the domain
+at the Pages project before submitting the site to Google. Steps in the Cloudflare
+dashboard:
+
+1. Confirm `bitecare.com` is in the same Cloudflare account as the Pages project (free
+   plan is fine). If the domain is registered elsewhere, add it as a site in Cloudflare
+   and follow Cloudflare's nameserver instructions at the registrar.
+2. Pages project → **Settings → Domains & routes → Set up a custom domain**.
+3. Enter `bitecare.com` and confirm. If the zone is in the same account, Cloudflare
+   creates the DNS record automatically and issues the certificate; if not, create the
+   record it shows.
+4. Add `www.bitecare.com` the same way, then redirect it to the canonical domain with
+   **Rules → Redirect Rules → Create rule**: match *Hostname* `equals`
+   `www.bitecare.com`, then *Dynamic redirect* to
+   `concat("https://bitecare.com", http.request.uri.path)` with status **301** and
+   "Preserve query string" enabled. `_redirects` cannot match host names, so this
+   belongs in Redirect Rules, not in that file.
+5. In **SSL/TLS → Overview** the mode must be **Full** or **Full (strict)**. Cloudflare
+   issues the edge certificate automatically for both host names once the records
+   resolve.
+
+DNS records needed (Cloudflare creates the apex record for you in step 3; the others
+are listed for reference):
+
+| Type | Name | Content | Proxy |
+|------|------|---------|-------|
+| CNAME | `@` (apex) | `<project>.pages.dev` | Proxied |
+| CNAME | `www` | `<project>.pages.dev` | Proxied |
+
+The apex CNAME works on Cloudflare because of CNAME flattening; at another registrar
+an ALIAS/ANAME record would be needed instead.
+
+**Google Search Console**
+
+1. Open [Search Console](https://search.google.com/search-console) and add the property
+   **Domain** `bitecare.com`. Domain verification uses a DNS TXT record, which covers
+   `www` as well.
+2. Google shows a `TXT` record: create it under **DNS → Records** for the apex
+   (`@`), name `@`, content exactly as shown, and click verify. Verification can take
+   from minutes to a day.
+3. Once verified, submit the sitemap: **Sitemaps → enter** `sitemap.xml` **→ Submit**.
+4. Use **URL Inspection** on `https://bitecare.com/` and click **Request indexing**.
+5. No verification page or file is shipped in the repository on purpose — the DNS
+   method does not need one. If a `HTML file` upload or meta-tag method is chosen
+   instead, that token is a one-off and should be added to `index.html` or `public/`
+   at that time, never stored long-term.
+
 **Backend**
 
 - Apply migrations to the target Supabase project, either through the SQL Editor in
