@@ -1,1 +1,9 @@
-/*    /index.html   200
+# SPA fallback for BiteCare (React Router).
+#
+# Cloudflare Pages serves the app root for any path that does not match a
+# static asset whenever the project has no top-level 404.html file, which is
+# the case here. That is the SPA fallback, so no redirect rule is required.
+#
+# Do NOT add "/* /index.html 200" here. Cloudflare normalises .html URLs
+# (/index.html -> /index -> /), so that rule re-matches itself and is rejected
+# as an infinite loop (error 100324).
