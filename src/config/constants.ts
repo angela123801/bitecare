@@ -70,7 +70,7 @@ export const ANIMAL_TYPE_LABELS: Record<AnimalType, string> = {
   rat: 'Rat',
   bat: 'Bat',
   monkey: 'Monkey',
-  other: 'Other',
+  other: 'Others (Specify)',
 };
 
 export const VACCINATION_STATUS_LABELS: Record<VaccinationStatus, string> = {

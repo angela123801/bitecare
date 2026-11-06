@@ -126,7 +126,11 @@ export default function AllReportsPage({ detailPath = '/admin/reports', title = 
                         {r.patient_name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{ANIMAL_TYPE_LABELS[r.animal_type] ?? r.animal_type}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {r.animal_type === 'other' && r.animal_type_other
+                        ? `Others — ${r.animal_type_other}`
+                        : ANIMAL_TYPE_LABELS[r.animal_type] ?? r.animal_type}
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{formatDate(r.bite_date)}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${SEVERITY_COLORS[r.severity]}`}>

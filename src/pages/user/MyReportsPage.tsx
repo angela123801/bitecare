@@ -143,7 +143,9 @@ export default function MyReportsPage() {
                     </h3>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-gray-500">
                       <span className="capitalize">
-                        {ANIMAL_TYPE_LABELS[report.animal_type] ?? report.animal_type} bite
+                        {report.animal_type === 'other' && report.animal_type_other
+                          ? `Others — ${report.animal_type_other}`
+                          : `${ANIMAL_TYPE_LABELS[report.animal_type] ?? report.animal_type} bite`}
                       </span>
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5" />

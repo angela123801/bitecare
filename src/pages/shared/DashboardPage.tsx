@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { formatRelativeTime, getErrorMessage } from '@/lib/utils';
-import { ROLE_LABELS, REPORT_STATUS_LABELS, REPORT_STATUS_COLORS, SEVERITY_COLORS } from '@/config/constants';
+import { ROLE_LABELS, REPORT_STATUS_LABELS, REPORT_STATUS_COLORS, SEVERITY_COLORS, ANIMAL_TYPE_LABELS } from '@/config/constants';
 import type { BiteReport, UserRole } from '@/types';
 import {
   Loader2,
@@ -80,8 +80,11 @@ function ReportRow({ report }: { report: BiteReport }) {
       <div className={`w-2 h-2 rounded-full flex-shrink-0 ${SEVERITY_COLORS[report.severity]?.split(' ')[0] ?? 'bg-gray-300'}`} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray-900 truncate">{report.patient_name}</p>
-        <p className="text-xs text-gray-500 mt-0.5">
-          {report.animal_type} — {report.bite_site}
+        <p className="text-xs text-gray-500 mt-0.5 truncate">
+          {(report.animal_type === 'other' && report.animal_type_other
+            ? `Others — ${report.animal_type_other}`
+            : ANIMAL_TYPE_LABELS[report.animal_type] ?? report.animal_type
+          ) + ` — ${report.bite_site}`}
         </p>
       </div>
       <span className={`text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap ${REPORT_STATUS_COLORS[report.status]}`}>

@@ -214,7 +214,7 @@ export default function ReportDetailPage() {
         <Section icon={PawPrint} title="Incident Details">
           <Row label="Date" value={formatDate(report.bite_date)} />
           <Row label="Time" value={report.bite_time} />
-          <Row label="Animal" value={ANIMAL_TYPE_LABELS[report.animal_type] ?? report.animal_type} />
+          <Row label="Animal" value={report.animal_type === 'other' && report.animal_type_other ? `Others — ${report.animal_type_other}` : ANIMAL_TYPE_LABELS[report.animal_type] ?? report.animal_type} />
           <Row label="Animal Status" value={report.animal_status} />
           <Row label="Vaccinated" value={report.animal_vaccinated} />
           <Row label="Bite Site" value={report.bite_site} />

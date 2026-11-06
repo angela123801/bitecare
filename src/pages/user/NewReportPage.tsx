@@ -11,6 +11,7 @@ import {
   MapPin, ClipboardCheck, AlertCircle, Camera, X, Info, UserCheck, FileText,
 } from 'lucide-react';
 import LocationPicker from '@/components/map/LocationPicker';
+import PostSubmissionFirstAidModal from '@/components/user/PostSubmissionFirstAidModal';
 import { isValidLatLng } from '@/lib/geo';
 
 const STEPS = [
@@ -73,6 +74,13 @@ export default function NewReportPage() {
   const [showCoords, setShowCoords] = useState(true);
   const [prefilled, setPrefilled] = useState(false);
   const [submittedRef, setSubmittedRef] = useState<string | null>(null);
+  // Animal type as actually saved on the submitted report; the guidance modal
+  // is keyed on this, not on the form value, so it only appears after a
+  // confirmed save.
+  const [submittedAnimalType, setSubmittedAnimalType] = useState<
+    'dog' | 'cat' | 'rat' | 'other' | null
+  >(null);
+  const [submittedAnimalOther, setSubmittedAnimalOther] = useState('');
 
   useEffect(() => {
     supabase.from('barangays').select('*').order('name').then(({ data, error }) => {
@@ -160,7 +168,8 @@ export default function NewReportPage() {
     } else if (step === 1) {
       if (!f.bite_date) e.bite_date = 'Required';
       if (!f.animal_type) e.animal_type = 'Required';
-      if (f.animal_type === 'other' && !f.animal_type_other.trim()) e.animal_type_other = 'Required';
+      if (f.animal_type === 'other' && !f.animal_type_other.trim())
+        e.animal_type_other = 'Please specify the animal';
       if (!f.wound_type) e.wound_type = 'Required';
       if (!f.category) e.category = 'Required';
       if (!f.bite_site.trim()) e.bite_site = 'Required';
@@ -243,6 +252,12 @@ export default function NewReportPage() {
         }
       }
 
+      setSubmittedAnimalType(
+        f.animal_type === 'dog' || f.animal_type === 'cat' || f.animal_type === 'rat' || f.animal_type === 'other'
+          ? f.animal_type
+          : 'other',
+      );
+      setSubmittedAnimalOther(f.animal_type_other.trim());
       setSubmittedRef(reportReference(report.id));
     } catch (submitErr) {
       setError(getErrorMessage(submitErr, 'Failed to submit report. Please try again.'));
@@ -256,6 +271,13 @@ export default function NewReportPage() {
   if (submittedRef) {
     return (
       <div className="max-w-2xl mx-auto">
+        {submittedAnimalType && (
+          <PostSubmissionFirstAidModal
+            animalType={submittedAnimalType}
+            otherLabel={submittedAnimalOther || null}
+            onClose={() => setSubmittedAnimalType(null)}
+          />
+        )}
         <div className="card p-8 text-center">
           <div className="w-16 h-16 rounded-full bg-success-50 flex items-center justify-center mx-auto mb-4">
             <CheckCircle2 className="w-8 h-8 text-success-600" />
@@ -396,13 +418,22 @@ export default function NewReportPage() {
                 <Label text="Animal Type" req />
                 <select className="input-field" value={f.animal_type} onChange={(e) => set('animal_type', e.target.value)}>
                   <option value="">Select</option>
-                  {Object.entries(ANIMAL_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  <option value="cat">Cat</option>
+                  <option value="dog">Dog</option>
+                  <option value="rat">Rat</option>
+                  <option value="other">Others (Specify)</option>
                 </select><Err k="animal_type" />
               </div>
               {f.animal_type === 'other' && (
                 <div className="sm:col-span-2">
                   <Label text="Specify Animal" req />
-                  <input className="input-field" value={f.animal_type_other} onChange={(e) => set('animal_type_other', e.target.value)} placeholder="e.g. snake, monkey" />
+                  <input
+                    className="input-field"
+                    value={f.animal_type_other}
+                    onChange={(e) => set('animal_type_other', e.target.value)}
+                    placeholder="e.g. bat, monkey, ferret"
+                    maxLength={60}
+                  />
                   <Err k="animal_type_other" />
                 </div>
               )}
@@ -531,7 +562,16 @@ export default function NewReportPage() {
             <div className="card p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wide">Incident</h3>
               <Row label="Date / Time" value={`${f.bite_date} ${f.bite_time || ''}`} />
-              <Row label="Animal" value={f.animal_type === 'other' && f.animal_type_other ? f.animal_type_other : f.animal_type ? ANIMAL_TYPE_LABELS[f.animal_type as AnimalType] : '—'} />
+              <Row
+                label="Animal"
+                value={
+                  f.animal_type === 'other' && f.animal_type_other
+                    ? `Others — ${f.animal_type_other.trim()}`
+                    : f.animal_type
+                      ? ANIMAL_TYPE_LABELS[f.animal_type as AnimalType] ?? f.animal_type
+                      : '—'
+                }
+              />
               <Row label="Animal Status" value={f.animal_status} />
               <Row label="Vaccinated" value={f.animal_vaccinated} />
               <Row label="Bite Site" value={f.bite_site} />

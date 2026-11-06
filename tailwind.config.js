@@ -70,6 +70,15 @@ export default {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
         display: ['Poppins', 'Inter', 'system-ui', 'sans-serif'],
       },
+      keyframes: {
+        'slide-up': {
+          from: { transform: 'translateY(24px)', opacity: '0' },
+          to: { transform: 'translateY(0)', opacity: '1' },
+        },
+      },
+      animation: {
+        'slide-up': 'slide-up 0.25s ease-out',
+      },
     },
   },
   plugins: [],
