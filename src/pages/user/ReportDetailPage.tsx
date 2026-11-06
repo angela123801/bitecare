@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { BiteReport, BiteReportStatusHistory, VaccinationRecord, ReportStatus, Barangay, Profile } from '@/types';
 import { REPORT_STATUS_COLORS, REPORT_STATUS_LABELS, SEVERITY_COLORS, SEVERITY_LABELS, ANIMAL_TYPE_LABELS, CATEGORY_LABELS, VACCINATION_STATUS_COLORS, VACCINATION_STATUS_LABELS } from '@/config/constants';
-import { formatDate, formatDateTime, cn, getErrorMessage } from '@/lib/utils';
+import { formatDate, formatDateTime, cn, getErrorMessage, reportReference } from '@/lib/utils';
 import { notifyUser } from '@/lib/notifications';
 import EditReportLocationModal from '@/components/map/EditReportLocationModal';
 import { ArrowLeft, Loader2, AlertCircle, Clock, Syringe, User, PawPrint, MapPin, ShieldCheck, Send, CheckCircle2, UserPlus, Trash2 } from 'lucide-react';
@@ -192,7 +192,7 @@ export default function ReportDetailPage() {
         <button onClick={() => navigate(-1)} className="btn-secondary p-2"><ArrowLeft className="w-4 h-4" /></button>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold text-gray-900 truncate">{report.patient_name}</h1>
-          <p className="text-sm text-gray-500">Report filed {formatDate(report.created_at)}</p>
+          <p className="text-sm text-gray-500">Report filed {formatDate(report.created_at)} · Ref {reportReference(report.id)}</p>
         </div>
         <div className="flex flex-col items-end gap-1">
           <span className={cn('px-3 py-1 rounded-full text-xs font-medium', REPORT_STATUS_COLORS[report.status])}>{REPORT_STATUS_LABELS[report.status]}</span>
@@ -206,6 +206,7 @@ export default function ReportDetailPage() {
           <Row label="Age" value={report.patient_age} />
           <Row label="Sex" value={report.patient_sex} />
           <Row label="Phone" value={report.patient_phone} />
+          <Row label="Email" value={report.patient_email} />
           <Row label="Address" value={report.patient_address} />
           <Row label="Barangay" value={pBrgy?.name} />
         </Section>

@@ -67,6 +67,7 @@ export interface BiteReport {
   patient_age: number | null;
   patient_sex: 'male' | 'female' | 'other' | null;
   patient_phone: string;
+  patient_email: string;
   patient_address: string;
   patient_barangay_id: string | null;
   bite_date: string;

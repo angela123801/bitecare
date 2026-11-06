@@ -10,7 +10,7 @@ import {
   SEVERITY_LABELS,
   ANIMAL_TYPE_LABELS,
 } from '@/config/constants';
-import { formatDate, cn, getErrorMessage } from '@/lib/utils';
+import { formatDate, cn, getErrorMessage, reportReference } from '@/lib/utils';
 import {
   Loader2,
   PawPrint,
@@ -148,6 +148,9 @@ export default function MyReportsPage() {
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5" />
                         {formatDate(report.bite_date)}
+                      </span>
+                      <span className="font-mono text-xs text-gray-400">
+                        Ref {reportReference(report.id)}
                       </span>
                     </div>
                   </div>

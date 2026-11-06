@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { validateImage, uploadBitePhoto } from '@/lib/storage';
 import type { Barangay, AnimalType, WoundType, ExposureCategory } from '@/types';
 import { ANIMAL_TYPE_LABELS, CATEGORY_LABELS } from '@/config/constants';
-import { cn, getErrorMessage } from '@/lib/utils';
+import { cn, getErrorMessage, ageFromDateOfBirth, reportReference } from '@/lib/utils';
 import {
   ChevronLeft, ChevronRight, Loader2, CheckCircle2, User, PawPrint,
-  MapPin, ClipboardCheck, AlertCircle, Camera, X,
+  MapPin, ClipboardCheck, AlertCircle, Camera, X, Info, UserCheck, FileText,
 } from 'lucide-react';
 import LocationPicker from '@/components/map/LocationPicker';
 import { isValidLatLng } from '@/lib/geo';
@@ -26,7 +26,7 @@ const WOUND_LABELS: Record<WoundType, string> = {
 
 interface FormData {
   patient_name: string; patient_age: string; patient_sex: string;
-  patient_phone: string; patient_address: string; patient_barangay_id: string;
+  patient_phone: string; patient_email: string; patient_address: string; patient_barangay_id: string;
   bite_date: string; bite_time: string; animal_type: string; animal_type_other: string; animal_status: string;
   animal_vaccinated: string; bite_site: string; wound_type: string; category: string;
   number_of_wounds: string; provoked: boolean; first_aid_given: boolean;
@@ -36,7 +36,7 @@ interface FormData {
 
 const init: FormData = {
   patient_name: '', patient_age: '', patient_sex: '', patient_phone: '',
-  patient_address: '', patient_barangay_id: '',
+  patient_email: '', patient_address: '', patient_barangay_id: '',
   bite_date: new Date().toISOString().split('T')[0], bite_time: '',
   animal_type: '', animal_type_other: '', animal_status: '', animal_vaccinated: 'unknown',
   bite_site: '', wound_type: '', category: '', number_of_wounds: '1',
@@ -57,9 +57,11 @@ const Row = ({ label, value }: { label: string; value: string }) => (
 );
 
 export default function NewReportPage() {
-  const { user } = useAuth();
+  const { user, profile, profileLoading } = useAuth();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
+  const prefilledRef = useRef(false);
+  const submitLockRef = useRef(false);
   const [step, setStep] = useState(0);
   const [f, setF] = useState<FormData>(init);
   const [barangays, setBrgy] = useState<Barangay[]>([]);
@@ -69,6 +71,8 @@ export default function NewReportPage() {
   const [photos, setPhotos] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [showCoords, setShowCoords] = useState(true);
+  const [prefilled, setPrefilled] = useState(false);
+  const [submittedRef, setSubmittedRef] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.from('barangays').select('*').order('name').then(({ data, error }) => {
@@ -76,6 +80,25 @@ export default function NewReportPage() {
       if (data) setBrgy(data);
     });
   }, []);
+
+  // Populate the reporter's own details from their profile once it has loaded.
+  // Only empty fields are filled, so anything already typed is never clobbered.
+  useEffect(() => {
+    if (prefilledRef.current || profileLoading || !profile) return;
+    prefilledRef.current = true;
+    const derivedAge = ageFromDateOfBirth(profile.date_of_birth);
+    const composedAddress = [profile.address, profile.city].map((s) => (s || '').trim()).filter(Boolean).join(', ');
+    setF((p) => ({
+      ...p,
+      patient_name: p.patient_name || profile.full_name || '',
+      patient_phone: p.patient_phone || profile.phone || '',
+      patient_email: p.patient_email || profile.email || '',
+      patient_address: p.patient_address || composedAddress,
+      patient_barangay_id: p.patient_barangay_id || profile.barangay_id || '',
+      patient_age: p.patient_age || (derivedAge != null ? String(derivedAge) : ''),
+    }));
+    setPrefilled(true);
+  }, [profile, profileLoading]);
 
   // Clean up preview URLs on unmount
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
@@ -165,7 +188,9 @@ export default function NewReportPage() {
 
   /* --- Submit --- */
   const handleSubmit = async () => {
-    if (!user) return;
+    if (!user || submitLockRef.current) return;
+    if (!validate()) return;
+    submitLockRef.current = true;
     setSubmitting(true); setError('');
 
     try {
@@ -173,6 +198,7 @@ export default function NewReportPage() {
         reporter_id: user.id, patient_name: f.patient_name.trim(),
         patient_age: f.patient_age ? Number(f.patient_age) : null,
         patient_sex: f.patient_sex || null, patient_phone: f.patient_phone.trim(),
+        patient_email: f.patient_email.trim(),
         patient_address: f.patient_address.trim(),
         patient_barangay_id: f.patient_barangay_id || null,
         bite_date: f.bite_date, bite_time: f.bite_time || null,
@@ -190,7 +216,11 @@ export default function NewReportPage() {
         status: 'reported' as const,
       }).select('id').single();
 
-      if (err || !report) { setError(err?.message ?? 'Failed to create report'); return; }
+      if (err || !report) {
+        setError(err?.message ?? 'Failed to create report');
+        submitLockRef.current = false;
+        return;
+      }
 
       // Upload photos (non-fatal: the report already exists)
       if (photos.length > 0) {
@@ -213,13 +243,52 @@ export default function NewReportPage() {
         }
       }
 
-      navigate('/my-reports', { replace: true });
+      setSubmittedRef(reportReference(report.id));
     } catch (submitErr) {
       setError(getErrorMessage(submitErr, 'Failed to submit report. Please try again.'));
+      submitLockRef.current = false;
     } finally {
       setSubmitting(false);
     }
   };
+
+  /* --- Success confirmation --- */
+  if (submittedRef) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="card p-8 text-center">
+          <div className="w-16 h-16 rounded-full bg-success-50 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-8 h-8 text-success-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Report submitted</h1>
+          <p className="text-gray-500 text-sm mb-6">
+            Your animal bite report has been recorded. A health worker will review it.
+          </p>
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 mb-6">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Report Reference</p>
+            <p className="mt-1 font-mono text-xl font-bold text-gray-900 tracking-wider">{submittedRef}</p>
+            <p className="mt-2 text-xs text-gray-500">
+              Keep this reference for follow-up. You can also find it under My Reports.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link to="/my-reports" className="btn-secondary px-5 py-2.5 flex items-center justify-center gap-2">
+              <FileText className="w-4 h-4" /> View My Reports
+            </Link>
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard')}
+              className="btn-primary px-5 py-2.5"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -252,27 +321,67 @@ export default function NewReportPage() {
           </div>
         )}
 
-        {/* Step 0: Patient */}
+        {/* Step 0: Personal Information (auto-filled from profile) */}
         {step === 0 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900">Patient Information</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-2">
-                <Label text="Full Name" req /><input className="input-field" value={f.patient_name} onChange={(e) => set('patient_name', e.target.value)} /><Err k="patient_name" />
-              </div>
-              <div>
-                <Label text="Age" /><input className="input-field" type="number" min={0} max={150} value={f.patient_age} onChange={(e) => set('patient_age', e.target.value)} />
-              </div>
-              <div>
-                <Label text="Sex" req />
-                <select className="input-field" value={f.patient_sex} onChange={(e) => set('patient_sex', e.target.value)}>
-                  <option value="">Select</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
-                </select><Err k="patient_sex" />
-              </div>
-              <div><Label text="Phone" /><input className="input-field" value={f.patient_phone} onChange={(e) => set('patient_phone', e.target.value)} placeholder="09XX XXX XXXX" /></div>
-              <div><Label text="Barangay" /><BrgySelect field="patient_barangay_id" /></div>
-              <div className="sm:col-span-2"><Label text="Address" /><input className="input-field" value={f.patient_address} onChange={(e) => set('patient_address', e.target.value)} /></div>
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                <UserCheck className="w-5 h-5 text-primary-600" /> Personal Information
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Filled in from your BiteCare profile so you don't have to retype it. Correct anything that has changed.
+              </p>
             </div>
+
+            {profileLoading ? (
+              <div className="flex items-center justify-center gap-2 py-10 text-gray-500 text-sm">
+                <Loader2 className="w-5 h-5 animate-spin text-primary-600" /> Loading your saved information…
+              </div>
+            ) : (
+              <>
+                {!profile && (
+                  <div className="p-3 rounded-lg bg-warning-50 border border-warning-200 text-warning-800 text-sm flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>We couldn't load your saved profile. You can still enter your details below.</span>
+                  </div>
+                )}
+
+                {prefilled && profile && (
+                  <div className="p-3 rounded-lg bg-primary-50 border border-primary-100 text-primary-800 text-sm flex items-start gap-2">
+                    <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>
+                      These details come from your account.{' '}
+                      <Link to="/profile" className="font-medium underline underline-offset-2 hover:text-primary-900">
+                        Update your profile
+                      </Link>{' '}
+                      if something is missing or out of date.
+                    </span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <Label text="Full Name" req />
+                    <input className="input-field" value={f.patient_name} onChange={(e) => set('patient_name', e.target.value)} />
+                    <Err k="patient_name" />
+                  </div>
+                  <div>
+                    <Label text="Age" />
+                    <input className="input-field" type="number" min={0} max={150} value={f.patient_age} onChange={(e) => set('patient_age', e.target.value)} />
+                  </div>
+                  <div>
+                    <Label text="Sex" req />
+                    <select className="input-field" value={f.patient_sex} onChange={(e) => set('patient_sex', e.target.value)}>
+                      <option value="">Select</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
+                    </select><Err k="patient_sex" />
+                  </div>
+                  <div><Label text="Phone" /><input className="input-field" value={f.patient_phone} onChange={(e) => set('patient_phone', e.target.value)} placeholder="09XX XXX XXXX" /></div>
+                  <div><Label text="Email" /><input className="input-field" type="email" value={f.patient_email} onChange={(e) => set('patient_email', e.target.value)} placeholder="name@example.com" /></div>
+                  <div><Label text="Barangay" /><BrgySelect field="patient_barangay_id" /></div>
+                  <div className="sm:col-span-2"><Label text="Address" /><input className="input-field" value={f.patient_address} onChange={(e) => set('patient_address', e.target.value)} /></div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -415,6 +524,7 @@ export default function NewReportPage() {
               <Row label="Name" value={f.patient_name} />
               <Row label="Age / Sex" value={`${f.patient_age || '—'} / ${f.patient_sex || '—'}`} />
               <Row label="Phone" value={f.patient_phone} />
+              <Row label="Email" value={f.patient_email} />
               <Row label="Address" value={f.patient_address} />
               <Row label="Barangay" value={brgyName(f.patient_barangay_id)} />
             </div>

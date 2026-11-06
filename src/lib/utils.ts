@@ -20,6 +20,23 @@ export function isValidPhMobile(input: string): boolean {
   return /^09[0-9]{9}$/.test(normalizePhMobile(input));
 }
 
+/** Short, human-readable reference for a report, derived from its id. */
+export function reportReference(id: string): string {
+  return id.replace(/-/g, '').slice(0, 8).toUpperCase();
+}
+
+/** Age in whole years from an ISO date of birth, or null when unusable. */
+export function ageFromDateOfBirth(dob: string | null | undefined): number | null {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const monthDiff = now.getMonth() - d.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < d.getDate())) age--;
+  return age >= 0 && age <= 150 ? age : null;
+}
+
 export function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-PH', {
     year: 'numeric',

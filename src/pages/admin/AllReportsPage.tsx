@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { REPORT_STATUS_LABELS, REPORT_STATUS_COLORS, SEVERITY_LABELS, SEVERITY_COLORS, ANIMAL_TYPE_LABELS } from '@/config/constants';
-import { formatDate, getErrorMessage } from '@/lib/utils';
+import { formatDate, getErrorMessage, reportReference } from '@/lib/utils';
 import type { BiteReport } from '@/types';
 import { Search, Loader2, Filter, ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
 
@@ -108,6 +108,7 @@ export default function AllReportsPage({ detailPath = '/admin/reports', title = 
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Ref</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Patient</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Animal</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
@@ -119,6 +120,7 @@ export default function AllReportsPage({ detailPath = '/admin/reports', title = 
               <tbody className="divide-y divide-gray-50">
                 {reports.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{reportReference(r.id)}</td>
                     <td className="px-4 py-3">
                       <Link to={`${detailPath}/${r.id}`} className="font-medium text-gray-900 hover:text-primary-600">
                         {r.patient_name}
