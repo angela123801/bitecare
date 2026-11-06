@@ -470,6 +470,27 @@ institutional web server). `public/_redirects` is included so single-page-app ro
 resolve correctly on hosts that read it. Set `VITE_SUPABASE_URL` and
 `VITE_SUPABASE_ANON_KEY` in the host’s environment settings before building.
 
+**Cloudflare Pages**
+
+| Setting | Value |
+|---------|-------|
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+
+Add the two Supabase values under **Settings → Environment variables**, for both the
+**Production** and **Preview** environments. Either spelling is accepted:
+
+- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, or
+- `SUPABASE_URL` / `SUPABASE_ANON_KEY` (the plain names Cloudflare injects)
+
+Both values are public by design — the anon key is protected by Row Level Security, not
+by being hidden — so they can be stored as ordinary text variables. They are read while
+the app is built, so changing them requires a new deployment to take effect.
+
+No `404.html` is generated, which is what lets Cloudflare Pages serve the app root for
+unmatched paths (the SPA fallback). Do not add a `/* /index.html 200` rule to
+`_redirects`; Cloudflare rejects it as an infinite loop.
+
 **Backend**
 
 - Apply migrations to the target Supabase project, either through the SQL Editor in
@@ -498,7 +519,7 @@ the latest commit is not enough.
 
 | Symptom | Cause and fix |
 |---------|---------------|
-| A configuration screen appears instead of the login page | `.env` is missing or empty. Copy `.env.example` to `.env` and fill in the Supabase URL and anon key. |
+| A configuration screen appears instead of the login page | Locally: `.env` is missing or empty — copy `.env.example` to `.env` and fill in the Supabase URL and anon key. On a deployed site: the host has no Supabase variables, or they were added after the last build. Add them to the host’s environment settings and redeploy. |
 | Codes never arrive | No SMS gateway is configured for the project, or the gateway phone is offline. Check the Edge Function secrets and the gateway dashboard. |
 | “This verification method is not available for your account” | The account has no valid mobile number on file. Add one to the account’s profile. |
 | “A valid Philippine mobile number is required” | Numbers must be in the form `09XXXXXXXXX`. |
