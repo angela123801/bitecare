@@ -467,8 +467,8 @@ npm run build     # produces dist/
 
 Publish the `dist/` folder to any static host (Netlify, Vercel, GitHub Pages, an
 institutional web server). `public/_redirects` is included so single-page-app routes
-resolve correctly on hosts that read it. Set `VITE_SUPABASE_URL` and
-`VITE_SUPABASE_ANON_KEY` in the host’s environment settings before building.
+resolve correctly on hosts that read it. No host configuration is needed — the Supabase
+connection is built in (see below).
 
 **Cloudflare Pages**
 
@@ -477,15 +477,20 @@ resolve correctly on hosts that read it. Set `VITE_SUPABASE_URL` and
 | Build command | `npm run build` |
 | Build output directory | `dist` |
 
-Add the two Supabase values under **Settings → Environment variables**, for both the
-**Production** and **Preview** environments. Either spelling is accepted:
+That is the whole configuration. The Supabase URL and anon key are committed in
+`src/config/supabaseDefaults.ts`, so the deployed build always has a working connection
+even though the host has no `.env` file. Both values are public by design and are not
+secrets: the anon key is Supabase’s browser key, protected by Row Level Security rather
+than by being hidden. On this project a signed-out caller gets zero rows from `profiles`
+and `bite_reports`, and can read only public reference data such as the barangay list.
 
-- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, or
-- `SUPABASE_URL` / `SUPABASE_ANON_KEY` (the plain names Cloudflare injects)
+The privileged keys — `service_role`, the database URL, and the SMS gateway keys — are
+**not** in the repository. They exist only as Edge Function secrets in Supabase.
 
-Both values are public by design — the anon key is protected by Row Level Security, not
-by being hidden — so they can be stored as ordinary text variables. They are read while
-the app is built, so changing them requires a new deployment to take effect.
+To point a build at a different Supabase project, set `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` in the host’s environment variables (either spelling, including
+the plain `SUPABASE_URL` / `SUPABASE_ANON_KEY`). Those override the committed defaults
+and are read while the app is built, so a change needs a new deployment.
 
 No `404.html` is generated, which is what lets Cloudflare Pages serve the app root for
 unmatched paths (the SPA fallback). Do not add a `/* /index.html 200` rule to
@@ -519,7 +524,7 @@ the latest commit is not enough.
 
 | Symptom | Cause and fix |
 |---------|---------------|
-| A configuration screen appears instead of the login page | Locally: `.env` is missing or empty — copy `.env.example` to `.env` and fill in the Supabase URL and anon key. On a deployed site: the host has no Supabase variables, or they were added after the last build. Add them to the host’s environment settings and redeploy. |
+| A configuration screen appears instead of the login page | This should no longer happen: the connection is built in. If it does, the built-in values in `src/config/supabaseDefaults.ts` were emptied — restore them, or set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` and rebuild. |
 | Codes never arrive | No SMS gateway is configured for the project, or the gateway phone is offline. Check the Edge Function secrets and the gateway dashboard. |
 | “This verification method is not available for your account” | The account has no valid mobile number on file. Add one to the account’s profile. |
 | “A valid Philippine mobile number is required” | Numbers must be in the form `09XXXXXXXXX`. |
