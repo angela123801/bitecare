@@ -79,16 +79,18 @@ function useNavItems(): NavItem[] {
     ];
   }
 
-  // super_admin
+  // super_admin — oversees the whole system but works no cases. The bite
+  // report, vaccination and appointment screens are all view-only for this
+  // role, so they stay in the navigation as read-only review surfaces.
   return [
     ...base,
     { label: 'Bite Reports', path: '/admin/reports', icon: <FileText className="w-5 h-5" /> },
-    { label: 'Vaccinations', path: '/vaccinations', icon: <Syringe className="w-5 h-5" /> },
-    { label: 'Appointments', path: '/appointments', icon: <CalendarDays className="w-5 h-5" /> },
     { label: 'Facilities', path: '/admin/facilities', icon: <Building2 className="w-5 h-5" /> },
     { label: 'Map', path: '/map', icon: <Map className="w-5 h-5" /> },
     { label: 'Users', path: '/admin/users', icon: <Users className="w-5 h-5" /> },
     { label: 'Create Account', path: '/admin/users/new', icon: <UserPlus className="w-5 h-5" /> },
+    { label: 'Vaccinations', path: '/vaccinations', icon: <Syringe className="w-5 h-5" /> },
+    { label: 'Appointments', path: '/appointments', icon: <CalendarDays className="w-5 h-5" /> },
     { label: 'Education', path: '/admin/education', icon: <BookOpen className="w-5 h-5" /> },
     { label: 'Analytics', path: '/admin/analytics', icon: <BarChart3 className="w-5 h-5" /> },
     { label: 'Audit Log', path: '/admin/audit-log', icon: <ScrollText className="w-5 h-5" /> },

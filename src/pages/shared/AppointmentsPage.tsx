@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { VACCINATION_STATUS_LABELS, VACCINATION_STATUS_COLORS } from '@/config/constants';
 import { formatDate, getErrorMessage } from '@/lib/utils';
 import { notifyUser, getReportReporterId } from '@/lib/notifications';
@@ -9,6 +10,9 @@ import { CalendarDays, Loader2, Inbox, Check, X, AlertTriangle } from 'lucide-re
 type FilterType = 'all' | 'today' | 'week' | 'overdue';
 
 export default function AppointmentsPage() {
+  const { profile } = useAuth();
+  // Super Admin oversees appointments but does not complete or miss them.
+  const isSuperAdmin = profile?.role === 'super_admin';
   const [records, setRecords] = useState<VaccinationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>('all');
@@ -132,12 +136,16 @@ export default function AppointmentsPage() {
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${VACCINATION_STATUS_COLORS[r.status]}`}>
                     {isOverdue ? 'Overdue' : VACCINATION_STATUS_LABELS[r.status]}
                   </span>
-                  <button onClick={() => updateStatus(r.id, 'completed', 'completed')} className="p-1.5 rounded text-success-600 hover:bg-success-50" title="Complete">
-                    <Check className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => updateStatus(r.id, 'missed', 'missed')} className="p-1.5 rounded text-danger-600 hover:bg-danger-50" title="Missed">
-                    <X className="w-4 h-4" />
-                  </button>
+                  {!isSuperAdmin && (
+                    <>
+                      <button onClick={() => updateStatus(r.id, 'completed', 'completed')} className="p-1.5 rounded text-success-600 hover:bg-success-50" title="Complete">
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => updateStatus(r.id, 'missed', 'missed')} className="p-1.5 rounded text-danger-600 hover:bg-danger-50" title="Missed">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             );

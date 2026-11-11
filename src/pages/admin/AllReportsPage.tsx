@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { REPORT_STATUS_LABELS, REPORT_STATUS_COLORS, SEVERITY_LABELS, SEVERITY_COLORS, ANIMAL_TYPE_LABELS } from '@/config/constants';
 import { formatDate, getErrorMessage, reportReference } from '@/lib/utils';
 import type { BiteReport } from '@/types';
-import { Search, Loader2, Filter, ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
+import { Search, Loader2, Filter, ChevronLeft, ChevronRight, Inbox, Eye } from 'lucide-react';
 
 const PAGE_SIZE = 20;
 
@@ -15,6 +16,8 @@ interface AllReportsPageProps {
 }
 
 export default function AllReportsPage({ detailPath = '/admin/reports', title = 'Bite Reports' }: AllReportsPageProps) {
+  const { profile } = useAuth();
+  const isSuperAdmin = profile?.role === 'super_admin';
   const [reports, setReports] = useState<BiteReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -68,6 +71,19 @@ export default function AllReportsPage({ detailPath = '/admin/reports', title = 
           <p className="text-sm text-gray-500 mt-1">{total} total reports</p>
         </div>
       </div>
+
+      {isSuperAdmin && (
+        <div className="p-3 rounded-xl bg-primary-50 border border-primary-200 text-primary-800 flex items-start gap-3">
+          <Eye className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">View-only mode</p>
+            <p className="text-sm mt-0.5">
+              You can open, search and review every bite report. Case updates, assignment, status changes and
+              archiving are performed by Admins and Health Workers.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">

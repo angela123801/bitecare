@@ -8,7 +8,9 @@ import type { VaccinationRecord, BiteReport } from '@/types';
 import { Loader2, Search, Plus, X, Inbox, Check } from 'lucide-react';
 
 export default function VaccinationManagementPage() {
-  const { isRoleAtLeast } = useAuth();
+  const { isRoleAtLeast, profile } = useAuth();
+  // Super Admin reviews vaccination progress but never creates or updates it.
+  const isSuperAdmin = profile?.role === 'super_admin';
   const [records, setRecords] = useState<(VaccinationRecord & { report?: BiteReport })[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -117,7 +119,7 @@ export default function VaccinationManagementPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Vaccination Records</h1>
-        {isRoleAtLeast('health_worker') && (
+        {isRoleAtLeast('health_worker') && !isSuperAdmin && (
           <button onClick={() => { fetchReports(); setShowForm(true); }} className="btn-primary flex items-center gap-2">
             <Plus className="w-4 h-4" /> Generate Schedule
           </button>
@@ -188,7 +190,7 @@ export default function VaccinationManagementPage() {
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Dose</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Scheduled</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
+                {!isSuperAdmin && <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>}
               </tr></thead>
               <tbody className="divide-y divide-gray-50">
                 {filtered.map(r => (
@@ -202,18 +204,20 @@ export default function VaccinationManagementPage() {
                         {VACCINATION_STATUS_LABELS[r.status]}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      {r.status === 'scheduled' && (
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => updateStatus(r.id, 'completed', 'completed')} className="p-1.5 rounded text-success-600 hover:bg-success-50" title="Mark Completed">
-                            <Check className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => updateStatus(r.id, 'missed', 'missed')} className="p-1.5 rounded text-danger-600 hover:bg-danger-50" title="Mark Missed">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-                    </td>
+                    {!isSuperAdmin && (
+                      <td className="px-4 py-3">
+                        {r.status === 'scheduled' && (
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => updateStatus(r.id, 'completed', 'completed')} className="p-1.5 rounded text-success-600 hover:bg-success-50" title="Mark Completed">
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => updateStatus(r.id, 'missed', 'missed')} className="p-1.5 rounded text-danger-600 hover:bg-danger-50" title="Mark Missed">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

@@ -7,9 +7,13 @@ import { Loader2 } from 'lucide-react';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   minRole?: UserRole;
+  // A role that must never reach this route, whatever its rank. Used for the
+  // report form: the Super Admin oversees bite reports but does not file them,
+  // so the rank-based check would otherwise let the role straight through.
+  denyRole?: UserRole;
 }
 
-export function ProtectedRoute({ children, minRole }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, minRole, denyRole }: ProtectedRouteProps) {
   const { user, profile, loading, profileLoading, isRoleAtLeast } = useAuth();
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -59,6 +63,10 @@ export function ProtectedRoute({ children, minRole }: ProtectedRouteProps) {
   }
 
   if (minRole && !isRoleAtLeast(minRole)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (denyRole && profile.role === denyRole) {
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -59,7 +59,7 @@ export default function App() {
 
             {/* User */}
             <Route path="/my-reports" element={<MyReportsPage />} />
-            <Route path="/reports/new" element={<NewReportPage />} />
+            <Route path="/reports/new" element={<ProtectedRoute denyRole="super_admin"><NewReportPage /></ProtectedRoute>} />
             <Route path="/reports/:id" element={<ReportDetailPage />} />
             <Route path="/my-vaccinations" element={<MyVaccinationsPage />} />
 

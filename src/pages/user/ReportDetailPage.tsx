@@ -7,7 +7,7 @@ import { REPORT_STATUS_COLORS, REPORT_STATUS_LABELS, SEVERITY_COLORS, SEVERITY_L
 import { formatDate, formatDateTime, cn, getErrorMessage, reportReference } from '@/lib/utils';
 import { notifyUser } from '@/lib/notifications';
 import EditReportLocationModal from '@/components/map/EditReportLocationModal';
-import { ArrowLeft, Loader2, AlertCircle, Clock, Syringe, User, PawPrint, MapPin, ShieldCheck, Send, CheckCircle2, UserPlus, Archive, ArchiveRestore } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertCircle, Clock, Syringe, User, PawPrint, MapPin, ShieldCheck, Send, CheckCircle2, UserPlus, Archive, ArchiveRestore, Eye } from 'lucide-react';
 
 const ALL_STATUSES: ReportStatus[] = ['reported','under_investigation','treatment_started','treatment_ongoing','treatment_completed','closed','cancelled'];
 const WOUND_LABELS: Record<string, string> = { bite: 'Bite', scratch: 'Scratch', lick_on_broken_skin: 'Lick on Broken Skin', other: 'Other' };
@@ -52,8 +52,12 @@ export default function ReportDetailPage() {
   const [locationOpen, setLocationOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
-  const isStaff = profile?.role === 'health_worker' || profile?.role === 'admin' || profile?.role === 'super_admin';
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+  // Super Admin oversees the system but does not work cases: the role is
+  // view-only for the whole bite report module. The database enforces the same
+  // rule independently, so these checks only keep the interface honest.
+  const isSuperAdmin = profile?.role === 'super_admin';
+  const isStaff = !isSuperAdmin && (profile?.role === 'health_worker' || profile?.role === 'admin');
+  const isAdmin = profile?.role === 'admin';
   const reportSelect = '*, patient_barangay:barangays!patient_barangay_id(*), incident_barangay:barangays!incident_barangay_id(*), assigned_worker:profiles!assigned_worker_id(id, full_name, email)';
   const historySelect = '*, actor:profiles!changed_by(id, full_name)';
 
@@ -183,13 +187,26 @@ export default function ReportDetailPage() {
   const pBrgy = report.patient_barangay as Barangay | undefined;
   const iBrgy = report.incident_barangay as Barangay | undefined;
   const hasCoords = report.incident_latitude != null && report.incident_longitude != null;
-  const canEditLocation = report.reporter_id === profile?.id || isStaff;
+  const canEditLocation = !isSuperAdmin && (report.reporter_id === profile?.id || isStaff);
   const barangayCenter = iBrgy?.latitude != null && iBrgy?.longitude != null
     ? { lat: iBrgy.latitude, lng: iBrgy.longitude }
     : undefined;
 
   return (
     <div className="max-w-3xl mx-auto">
+      {isSuperAdmin && (
+        <div className="mb-4 p-3 rounded-xl bg-primary-50 border border-primary-200 text-primary-800 flex items-start gap-3">
+          <Eye className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">View-only mode</p>
+            <p className="text-sm mt-0.5">
+              Super Admin access is read-only for bite reports. Case updates, assignment, status changes and
+              archiving are handled by Admins and Health Workers.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => navigate(-1)} className="btn-secondary p-2"><ArrowLeft className="w-4 h-4" /></button>
         <div className="flex-1 min-w-0">
@@ -362,7 +379,7 @@ export default function ReportDetailPage() {
                     )}
                   </div>
                 ) : null}
-                {(!report.assigned_worker || assignWorker !== null) && isStaff && (
+                {(!report.assigned_worker || assignWorker !== null) && isStaff && !isSuperAdmin && (
                   <div className="flex gap-2 mt-2">
                     <select className="input-field flex-1" value={assignWorker ?? ''} onChange={(e) => setAssignWorker(e.target.value)}>
                       <option value="">Select health worker</option>
@@ -376,6 +393,19 @@ export default function ReportDetailPage() {
               </div>
             </div>
           </section>
+        )}
+
+        {isSuperAdmin && (
+          <Section icon={UserPlus} title="Case Assignment">
+            {report.assigned_worker ? (
+              <Row label="Assigned to" value={(report.assigned_worker as { full_name: string }).full_name} />
+            ) : (
+              <p className="text-sm text-gray-400 py-3">Not yet assigned to a health worker.</p>
+            )}
+            <p className="text-xs text-gray-500 mt-2">
+              Assignment is managed by Admins. Super Admin access is view-only.
+            </p>
+          </Section>
         )}
       </div>
 
