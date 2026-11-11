@@ -27,6 +27,35 @@ export interface Barangay {
   created_at: string;
 }
 
+export type RecoveryStatus = 'pending_verification' | 'restored' | 'rejected';
+
+export interface AccountRecoveryRequest {
+  id: string;
+  entity_id: string;
+  display_name: string;
+  email: string | null;
+  previous_role: string;
+  status: RecoveryStatus;
+  reason: string;
+  evidence: unknown[];
+  requested_by: string | null;
+  reviewed_by: string | null;
+  requested_at: string;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MissingAccount {
+  entityId: string;
+  displayName: string;
+  email: string | null;
+  role: string;
+  lastSeen: string;
+  evidence: unknown[];
+  request: AccountRecoveryRequest | null;
+}
+
 export type FacilityVerificationStatus = 'verified' | 'unverified' | 'needs_review';
 
 export interface HealthcareFacility {
