@@ -3,13 +3,12 @@ import {
   X, RotateCcw, Crosshair, Loader2, Eye, MapPin, Flame, Building2, Info,
 } from 'lucide-react';
 import {
-  ANIMAL_TYPE_LABELS,
   REPORT_STATUS_LABELS,
   SEVERITY_LABELS,
 } from '@/config/constants';
 import { EMPTY_FILTERS, type MapFilters } from '@/lib/mapReports';
 import { cn } from '@/lib/utils';
-import type { AnimalType, ReportStatus, Severity } from '@/types';
+import type { ReportStatus, Severity } from '@/types';
 
 interface BarangayOption {
   id: string;
@@ -256,15 +255,42 @@ export default function MapControlPanel({
             <select
               id={`${panelId}-animal`}
               value={filters.animalType}
-              onChange={(e) => set('animalType', e.target.value as MapFilters['animalType'])}
+              onChange={(e) => {
+                const value = e.target.value as MapFilters['animalType'];
+                set('animalType', value);
+                // A stale custom value must not silently keep filtering once
+                // the category changes.
+                if (value !== 'other' && filters.animalTypeOther) set('animalTypeOther', '');
+              }}
               className="input-field text-sm py-1.5"
             >
               <option value="">All animals</option>
-              {(Object.keys(ANIMAL_TYPE_LABELS) as AnimalType[]).map((a) => (
-                <option key={a} value={a}>{ANIMAL_TYPE_LABELS[a]}</option>
-              ))}
+              <option value="dog">Dog</option>
+              <option value="cat">Cat</option>
+              <option value="rat">Rat</option>
+              <option value="other">Others (Specify)</option>
             </select>
           </div>
+
+          {filters.animalType === 'other' && (
+            <div>
+              <label htmlFor={`${panelId}-animal-other`} className="block text-xs font-medium text-gray-600 mb-1">
+                Specify Animal Type
+              </label>
+              <input
+                id={`${panelId}-animal-other`}
+                type="text"
+                value={filters.animalTypeOther}
+                onChange={(e) => set('animalTypeOther', e.target.value)}
+                placeholder="e.g. bat, monkey"
+                maxLength={60}
+                className="input-field text-sm py-1.5"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">
+                Leave blank to see every non-listed animal.
+              </p>
+            </div>
+          )}
         </section>
 
         {/* Actions */}

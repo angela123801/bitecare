@@ -14,6 +14,8 @@ import {
   BellOff,
   Loader2,
   CheckCheck,
+  Archive,
+  ArchiveRestore,
 } from 'lucide-react';
 
 const TYPE_ICONS: Record<NotificationType, React.ReactNode> = {
@@ -34,7 +36,7 @@ const TYPE_BG: Record<NotificationType, string> = {
   assignment: 'bg-primary-50',
 };
 
-type Filter = 'all' | 'unread';
+type Filter = 'all' | 'unread' | 'archive';
 
 export default function NotificationsPage() {
   const { user, isRole } = useAuth();
@@ -44,6 +46,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     if (!user) return;
@@ -106,8 +109,39 @@ export default function NotificationsPage() {
     refreshNotifications?.();
   };
 
-  const filtered = filter === 'unread' ? notifications.filter((n) => !n.is_read) : notifications;
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  /** Archives or restores one notification; the flag is per-notification and
+   *  never touches the bite report it refers to. */
+  const setArchived = async (n: Notification, archived: boolean) => {
+    setBusyId(n.id);
+    const { error: updateErr } = await supabase
+      .from('notifications')
+      .update({ is_archived: archived, archived_at: archived ? new Date().toISOString() : null })
+      .eq('id', n.id);
+
+    if (updateErr) {
+      setError(getErrorMessage(updateErr, 'Failed to update the notification'));
+      setBusyId(null);
+      return;
+    }
+    setNotifications((prev) =>
+      prev.map((item) =>
+        item.id === n.id
+          ? { ...item, is_archived: archived, archived_at: archived ? new Date().toISOString() : null }
+          : item
+      )
+    );
+    setBusyId(null);
+  };
+
+  const unreadCount = notifications.filter((n) => !n.is_archived && !n.is_read).length;
+  const archivedCount = notifications.filter((n) => n.is_archived).length;
+
+  const filtered =
+    filter === 'archive'
+      ? notifications.filter((n) => n.is_archived)
+      : filter === 'unread'
+        ? notifications.filter((n) => !n.is_archived && !n.is_read)
+        : notifications.filter((n) => !n.is_archived);
 
   const openNotification = (n: Notification) => {
     if (!n.is_read) markAsRead(n.id);
@@ -131,6 +165,8 @@ export default function NotificationsPage() {
     );
   }
 
+  const TAB_LABELS: Record<Filter, string> = { all: 'All', unread: 'Unread', archive: 'Archive' };
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
@@ -141,7 +177,7 @@ export default function NotificationsPage() {
             <p className="text-sm text-gray-500">{unreadCount} unread</p>
           )}
         </div>
-        {unreadCount > 0 && (
+        {filter !== 'archive' && unreadCount > 0 && (
           <button
             onClick={markAllAsRead}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
@@ -159,7 +195,7 @@ export default function NotificationsPage() {
 
       {/* Filter Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-        {(['all', 'unread'] as Filter[]).map((tab) => (
+        {(['all', 'unread', 'archive'] as Filter[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setFilter(tab)}
@@ -168,10 +204,15 @@ export default function NotificationsPage() {
               filter === tab ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
             )}
           >
-            {tab === 'all' ? 'All' : 'Unread'}
+            {TAB_LABELS[tab]}
             {tab === 'unread' && unreadCount > 0 && (
               <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary-600 text-white text-xs">
                 {unreadCount}
+              </span>
+            )}
+            {tab === 'archive' && archivedCount > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-400 text-white text-xs">
+                {archivedCount}
               </span>
             )}
           </button>
@@ -181,41 +222,68 @@ export default function NotificationsPage() {
       {/* Notification List */}
       {filtered.length === 0 ? (
         <div className="text-center py-16">
-          <BellOff className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+          {filter === 'archive' ? (
+            <Archive className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+          ) : (
+            <BellOff className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+          )}
           <p className="text-gray-500 font-medium">
-            {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
+            {filter === 'unread' ? 'No unread notifications' : filter === 'archive' ? 'No archived notifications' : 'No notifications yet'}
           </p>
           <p className="text-gray-400 text-sm mt-1">
-            {filter === 'unread' ? "You're all caught up!" : "We'll notify you when something happens"}
+            {filter === 'unread' ? "You're all caught up!" : filter === 'archive' ? 'Notifications you archive will appear here' : "We'll notify you when something happens"}
           </p>
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.map((n) => (
-            <button
+            <div
               key={n.id}
-              onClick={() => openNotification(n)}
               className={cn(
                 'w-full text-left flex items-start gap-4 p-4 rounded-xl border transition-colors',
-                n.is_read
-                  ? 'bg-white border-gray-100 hover:bg-gray-50'
-                  : 'bg-white border-primary-200 hover:bg-primary-50 shadow-sm'
+                n.is_archived
+                  ? 'bg-gray-50 border-gray-200'
+                  : n.is_read
+                    ? 'bg-white border-gray-100 hover:bg-gray-50'
+                    : 'bg-white border-primary-200 hover:bg-primary-50 shadow-sm'
               )}
             >
-              <div className={cn('flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center', TYPE_BG[n.type])}>
-                {TYPE_ICONS[n.type]}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <p className={cn('text-sm', n.is_read ? 'text-gray-700' : 'text-gray-900 font-semibold')}>
-                    {n.title}
-                  </p>
-                  {!n.is_read && <span className="flex-shrink-0 w-2 h-2 rounded-full bg-primary-600 mt-1.5" />}
+              <button
+                type="button"
+                onClick={() => openNotification(n)}
+                className="flex items-start gap-4 flex-1 min-w-0 text-left"
+              >
+                <div className={cn('flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center', TYPE_BG[n.type])}>
+                  {TYPE_ICONS[n.type]}
                 </div>
-                <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
-                <p className="text-xs text-gray-400 mt-1">{formatRelativeTime(n.created_at)}</p>
-              </div>
-            </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className={cn('text-sm', n.is_read ? 'text-gray-700' : 'text-gray-900 font-semibold')}>
+                      {n.title}
+                    </p>
+                    {!n.is_read && !n.is_archived && <span className="flex-shrink-0 w-2 h-2 rounded-full bg-primary-600 mt-1.5" />}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+                  <p className="text-xs text-gray-400 mt-1">{formatRelativeTime(n.created_at)}</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setArchived(n, !n.is_archived)}
+                disabled={busyId === n.id}
+                aria-label={n.is_archived ? 'Restore notification' : 'Archive notification'}
+                title={n.is_archived ? 'Restore to All' : 'Archive'}
+                className="flex-shrink-0 p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-50"
+              >
+                {busyId === n.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : n.is_archived ? (
+                  <ArchiveRestore className="w-4 h-4" />
+                ) : (
+                  <Archive className="w-4 h-4" />
+                )}
+              </button>
+            </div>
           ))}
         </div>
       )}

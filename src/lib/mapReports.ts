@@ -6,14 +6,15 @@ import type { AnimalType, ReportStatus, Severity } from '@/types';
 /** The columns the map needs. Deliberately excludes patient name, phone,
  *  address and any medical fields so no private data reaches the map. */
 const MAP_REPORT_COLUMNS =
-  'id, category, animal_type, incident_location, incident_latitude, incident_longitude, bite_date, status, severity, incident_barangay_id';
+  'id, category, animal_type, animal_type_other, incident_location, incident_latitude, incident_longitude, bite_date, status, severity, incident_barangay_id';
 
 export interface MapFilters {
   dateFrom: string;
   dateTo: string;
   barangayId: string;
   severity: '' | Severity;
-  animalType: '' | AnimalType;
+  animalType: '' | 'dog' | 'cat' | 'rat' | 'other';
+  animalTypeOther: string;
   status: '' | ReportStatus;
 }
 
@@ -23,6 +24,7 @@ export const EMPTY_FILTERS: MapFilters = {
   barangayId: '',
   severity: '',
   animalType: '',
+  animalTypeOther: '',
   status: '',
 };
 
@@ -30,6 +32,7 @@ export interface MapReport {
   id: string;
   category: string;
   animal_type: AnimalType;
+  animal_type_other: string;
   incident_location: string;
   incident_latitude: number;
   incident_longitude: number;
@@ -56,6 +59,7 @@ export function useMapReports(filters: MapFilters) {
     let query = supabase
       .from('bite_reports')
       .select(MAP_REPORT_COLUMNS)
+      .eq('is_archived', false)
       .not('incident_latitude', 'is', null)
       .not('incident_longitude', 'is', null)
       .order('bite_date', { ascending: false });
@@ -64,7 +68,14 @@ export function useMapReports(filters: MapFilters) {
     if (filters.dateTo) query = query.lte('bite_date', filters.dateTo);
     if (filters.barangayId) query = query.eq('incident_barangay_id', filters.barangayId);
     if (filters.severity) query = query.eq('severity', filters.severity);
-    if (filters.animalType) query = query.eq('animal_type', filters.animalType);
+    if (filters.animalType) {
+      query = query.eq('animal_type', filters.animalType);
+      // "Others" narrows to the exact animal the report specified; a blank
+      // custom value matches every non-listed animal.
+      if (filters.animalType === 'other' && filters.animalTypeOther.trim()) {
+        query = query.ilike('animal_type_other', `%${filters.animalTypeOther.trim()}%`);
+      }
+    }
     if (filters.status) query = query.eq('status', filters.status);
 
     const { data, error: err } = await query;
@@ -76,6 +87,7 @@ export function useMapReports(filters: MapFilters) {
     filters.barangayId,
     filters.severity,
     filters.animalType,
+    filters.animalTypeOther,
     filters.status,
   ]);
 

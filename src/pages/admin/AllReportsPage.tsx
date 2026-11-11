@@ -43,7 +43,13 @@ export default function AllReportsPage({ detailPath = '/admin/reports', title = 
       .order('created_at', { ascending: false })
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-    if (statusFilter !== 'all') query = query.eq('status', statusFilter);
+    if (statusFilter === 'archived') query = query.eq('is_archived', true);
+    else if (statusFilter !== 'all') {
+      query = query.eq('status', statusFilter).eq('is_archived', false);
+    } else {
+      // "All" lists the active records; archived ones live in their own filter.
+      query = query.eq('is_archived', false);
+    }
     if (search) query = query.ilike('patient_name', `%${search}%`);
 
     const { data, count, error: err } = await query;
@@ -81,10 +87,11 @@ export default function AllReportsPage({ detailPath = '/admin/reports', title = 
             onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
             className="input-field pl-9 pr-8 appearance-none"
           >
-            <option value="all">All Status</option>
+                        <option value="all">All Status</option>
             {Object.entries(REPORT_STATUS_LABELS).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
             ))}
+            <option value="archived">Archived</option>
           </select>
         </div>
       </div>
@@ -141,6 +148,11 @@ export default function AllReportsPage({ detailPath = '/admin/reports', title = 
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${REPORT_STATUS_COLORS[r.status]}`}>
                         {REPORT_STATUS_LABELS[r.status]}
                       </span>
+                      {r.is_archived && (
+                        <span className="ml-1 inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">
+                          Archived
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-500">
                       {(r as unknown as { reporter: { full_name: string } | null }).reporter?.full_name ?? 'Unknown'}

@@ -447,7 +447,7 @@ export default function MapPage() {
                 <div className="min-w-[190px]">
                   <h3 className="font-semibold text-sm text-gray-900">Bite Report</h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Category {r.category} &middot; {ANIMAL_TYPE_LABELS[r.animal_type] ?? r.animal_type}
+                    Category {r.category} &middot; {r.animal_type === 'other' && r.animal_type_other ? `Others \u2014 ${r.animal_type_other}` : ANIMAL_TYPE_LABELS[r.animal_type] ?? r.animal_type}
                   </p>
                   {r.incident_location && <p className="text-xs mt-1 text-gray-700">{r.incident_location}</p>}
                   <p className="text-xs text-gray-500 mt-0.5">{formatDate(r.bite_date)}</p>

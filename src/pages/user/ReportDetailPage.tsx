@@ -7,7 +7,7 @@ import { REPORT_STATUS_COLORS, REPORT_STATUS_LABELS, SEVERITY_COLORS, SEVERITY_L
 import { formatDate, formatDateTime, cn, getErrorMessage, reportReference } from '@/lib/utils';
 import { notifyUser } from '@/lib/notifications';
 import EditReportLocationModal from '@/components/map/EditReportLocationModal';
-import { ArrowLeft, Loader2, AlertCircle, Clock, Syringe, User, PawPrint, MapPin, ShieldCheck, Send, CheckCircle2, UserPlus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertCircle, Clock, Syringe, User, PawPrint, MapPin, ShieldCheck, Send, CheckCircle2, UserPlus, Archive, ArchiveRestore } from 'lucide-react';
 
 const ALL_STATUSES: ReportStatus[] = ['reported','under_investigation','treatment_started','treatment_ongoing','treatment_completed','closed','cancelled'];
 const WOUND_LABELS: Record<string, string> = { bite: 'Bite', scratch: 'Scratch', lick_on_broken_skin: 'Lick on Broken Skin', other: 'Other' };
@@ -50,8 +50,7 @@ export default function ReportDetailPage() {
 
   const [markingDose, setMarkingDose] = useState<string | null>(null);
   const [locationOpen, setLocationOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   const isStaff = profile?.role === 'health_worker' || profile?.role === 'admin' || profile?.role === 'super_admin';
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
@@ -166,16 +165,19 @@ export default function ReportDetailPage() {
     </div>
   );
 
-  const handleDelete = async () => {
-    if (!id) return;
-    setDeleting(true); setStatusError('');
-    const { error: e } = await supabase.from('bite_reports').delete().eq('id', id);
+  const handleArchive = async () => {
+    if (!id || !report) return;
+    setArchiving(true); setStatusError('');
+    const { error: e } = await supabase.rpc('archive_bite_report', {
+      p_report_id: id,
+      p_archived: !report.is_archived,
+    });
     if (e) {
-      setStatusError(getErrorMessage(e, 'Failed to delete this report.'));
-      setDeleting(false); setDeleteOpen(false);
-      return;
+      setStatusError(getErrorMessage(e, 'Failed to update the archive state of this report.'));
+    } else {
+      await refreshReport();
     }
-    navigate('/admin/reports', { replace: true });
+    setArchiving(false);
   };
 
   const pBrgy = report.patient_barangay as Barangay | undefined;
@@ -296,15 +298,23 @@ export default function ReportDetailPage() {
         </Section>
 
         {isAdmin && (
-          <section className="card p-5 border-danger-200">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-danger-700 uppercase tracking-wide mb-3">
-              <Trash2 className="w-4 h-4" /> Danger Zone
+          <section className="card p-5 border-gray-200">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-accent-700 uppercase tracking-wide mb-3">
+              <Archive className="w-4 h-4" /> Archive
             </h2>
             <p className="text-sm text-gray-600 mb-3">
-              Deleting this report permanently removes it, its photos, its vaccination records and its map marker. This cannot be undone.
+              {report.is_archived
+                ? 'This report is archived. It stays in the record with all photos and vaccination history, and can be restored at any time.'
+                : 'Archiving hides this report from active lists and the map without deleting anything. Photos, vaccination history and case status are kept, and an administrator can restore it later.'}
             </p>
-            <button type="button" className="btn-danger flex items-center gap-2" onClick={() => setDeleteOpen(true)}>
-              <Trash2 className="w-4 h-4" /> Delete report
+            <button
+              type="button"
+              className={report.is_archived ? 'btn-secondary flex items-center gap-2' : 'btn-accent flex items-center gap-2'}
+              onClick={handleArchive}
+              disabled={archiving}
+            >
+              {archiving ? <Loader2 className="w-4 h-4 animate-spin" /> : report.is_archived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+              {archiving ? 'Working…' : report.is_archived ? 'Restore report' : 'Archive report'}
             </button>
           </section>
         )}
@@ -379,34 +389,6 @@ export default function ReportDetailPage() {
         />
       )}
 
-      {deleteOpen && (
-        <div
-          className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Confirm delete report"
-          onClick={() => !deleting && setDeleteOpen(false)}
-        >
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="w-11 h-11 rounded-full bg-danger-50 flex items-center justify-center mb-3">
-              <Trash2 className="w-5 h-5 text-danger-600" />
-            </div>
-            <h2 className="text-base font-bold text-gray-900">Delete this report?</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              This permanently removes the report for {report.patient_name}, along with its photos, vaccination records and map marker. This cannot be undone.
-            </p>
-            <div className="flex items-center justify-end gap-2 mt-5">
-              <button type="button" className="btn-secondary" onClick={() => setDeleteOpen(false)} disabled={deleting}>
-                Cancel
-              </button>
-              <button type="button" className="btn-danger flex items-center gap-2" onClick={handleDelete} disabled={deleting}>
-                {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
-                {deleting ? 'Deleting…' : 'Delete permanently'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

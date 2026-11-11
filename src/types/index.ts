@@ -99,6 +99,9 @@ export interface BiteReport {
   first_aid_details: string;
   notes: string;
   closed_at: string | null;
+  is_archived: boolean;
+  archived_at: string | null;
+  archived_by: string | null;
   created_at: string;
   updated_at: string;
   reporter?: Profile;
@@ -171,6 +174,8 @@ export interface Notification {
   reference_id: string | null;
   is_read: boolean;
   read_at: string | null;
+  is_archived: boolean;
+  archived_at: string | null;
   created_at: string;
 }
 
